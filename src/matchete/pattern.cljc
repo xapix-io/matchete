@@ -119,37 +119,3 @@
 
 (defn match? [P data]
   (not (empty? (matches P data))))
-
-(comment
-
-  (matches '{:x ?...vals
-             :y ?...vals
-             :z ?...vals}
-           {:x 1
-            :y 2
-            :z 3})
-
-  (matches '{:users (each {:id ?...user-ids})}
-           {:users [{:id 1}
-                    {:id 2}
-                    {:id 3}]})
-
-  (matches '{:users (each {:id ?...user-ids})}
-           {:users [{:id 1}
-                    {:id 2}
-                    {}
-                    {:id 3}]})
-
-  (matches '{:users (some {:id ?...user-ids
-                           :group ?group})
-             :group ?group}
-           {:users [{:id 1
-                     :group :normal}
-                    {:id 2
-                     :group :admin}
-                    {}
-                    {:id 3
-                     :group :admin}]
-            :group :admin})
-
-  )
