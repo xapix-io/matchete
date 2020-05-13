@@ -5,6 +5,10 @@
   (and (symbol? P)
        (= (first (name P)) \?)))
 
+(defn- memo-binding? [P]
+  (and (symbol? P)
+       (= (first (name P)) \!)))
+
 (defn- placeholder? [P]
   (= '_ P))
 
@@ -95,6 +99,10 @@
     (fn [matches _data]
       (list matches))
 
+    (memo-binding? P)
+    (fn [matches data]
+      (list (update matches P (fnil conj []) data)))
+
     (binding? P)
     (fn [matches data]
       (if (contains? matches P)
@@ -118,4 +126,4 @@
   ((matcher P) data))
 
 (defn match? [P data]
-  (not (empty? (matches P data))))
+  (boolean (seq (matches P data))))

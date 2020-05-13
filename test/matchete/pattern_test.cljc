@@ -1,14 +1,15 @@
 (ns matchete.pattern-test
   (:require [matchete.pattern :as sut]
-            #?(:clj [clojure.test :refer [deftest testing is]]
-               :cljs [cljs.test :refer [deftest testing is] :include-macros true])))
+            #?(:clj [clojure.test :refer [deftest is]]
+               :cljs [cljs.test :refer [deftest is] :include-macros true])))
 
 (deftest core-test
   (is (= '({?x :x
             ?y :y
             ?obj {:x :x
                   :y :y}
-            ?k 1 ?v 1}
+            ?k 1
+            ?v 1}
            {?x :x
             ?y :y
             ?obj {:x :x
@@ -63,3 +64,12 @@
   (is (= [{'?key :foo}]
          (sut/matches '{(cat ?key :foo) 1}
                       {:foo 1}))))
+
+(deftest memo-binding
+  (is (= [{'!vals [1 2 3 4 5]}]
+         (sut/matches '{:x !vals
+                        :y !vals
+                        :z [!vals !vals !vals]}
+                      {:x 1
+                       :y 2
+                       :z [3 4 5 6]}))))
