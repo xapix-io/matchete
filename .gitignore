@@ -1,0 +1,27 @@
+# Created by https://www.gitignore.io/api/clojure
+# Edit at https://www.gitignore.io/?templates=clojure
+
+### Clojure ###
+pom.xml
+pom.xml.asc
+*.jar
+*.class
+/lib/
+/classes/
+/target/
+/checkouts/
+.lein-deps-sum
+.lein-repl-history
+.lein-plugins/
+.lein-failures
+.nrepl-port
+.nrepl-history
+.cpcache/
+.clj-kondo/.cache/
+
+### Emacs ###
+
+# directory configuration
+.dir-locals.el
+
+# End of https://www.gitignore.io/api/emacs,clojure

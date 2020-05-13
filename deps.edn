@@ -1,0 +1,11 @@
+{:paths ["src"]
+
+ :deps {org.clojure/math.combinatorics {:mvn/version "0.1.6"}}
+
+ :aliases
+ {:+test {:extra-paths ["test"]
+          :extra-deps {lambdaisland/kaocha {:mvn/version "1.0-612"}
+                       lambdaisland/kaocha-cloverage {:mvn/version "1.0-45"}
+                       lambdaisland/kaocha-cljs {:mvn/version "0.0-71"}}}
+
+  :+cljs {:extra-deps {org.clojure/clojurescript {:mvn/version "1.10.597"}}}}}
