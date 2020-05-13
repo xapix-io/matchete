@@ -9,5 +9,5 @@ jobs:
     - uses: actions/checkout@v1
     - uses: DeLaGuardo/clojure-lint-action@master
       with:
-        clj-kondo-args: --lint src,test
+        clj-kondo-args: --lint src --lint test
         github_token: ${{ secrets.GITHUB_TOKEN }}
