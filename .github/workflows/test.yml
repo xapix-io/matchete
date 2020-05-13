@@ -1,0 +1,43 @@
+name: Run tests for all environments
+
+on: push
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/setup-java@v1
+      with:
+        java-version: '1.8'
+
+    - uses: DeLaGuardo/setup-clojure@2.0
+      with:
+        tools-deps: latest
+
+    - uses: actions/checkout@v2
+
+    - name: Cache NodeJS dependencies
+      uses: actions/cache@v1
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - name: Cache clojure dependencies
+      uses: actions/cache@v1
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-clojure-${{ hashFiles('**/deps.edn') }}
+        restore-keys: |
+          ${{ runner.os }}-clojure-
+
+    - name: Install CLJS dependencies
+      run: |
+        npm install ws
+
+    - name: Run tests
+      run: |
+        ./bin/kaocha unit-clj --plugin cloverage
+        ./bin/kaocha unit-cljs

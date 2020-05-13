@@ -70,7 +70,7 @@
                  ms))
              (list matches)
              MS)))
-    exact (seq-matcher (rest P) true)
+    exact (seq-matcher (second P) true)
     (let [MS (map matcher* P)]
       (fn [matches data]
         (when (and (sequential? data)
