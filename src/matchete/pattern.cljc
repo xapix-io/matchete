@@ -6,7 +6,7 @@
        (= (first (name P)) \?)))
 
 (defn- placeholder? [P]
-  (= '?_ P))
+  (= '_ P))
 
 (defn- pattern? [P]
   (or (binding? P)

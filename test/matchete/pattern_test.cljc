@@ -25,7 +25,7 @@
                        :y ?y})
             (alt 1 ?x)
             {?k ?v}
-            ?_]
+            _]
           [1 "qwe" :x
            {:x :x
             'collections [1 2 3 :x]}
