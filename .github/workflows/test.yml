@@ -39,5 +39,5 @@ jobs:
 
     - name: Run tests
       run: |
-        ./bin/kaocha unit-clj --plugin cloverage
-        ./bin/kaocha unit-cljs
+        ./bin/kaocha clj --plugin cloverage
+        ./bin/kaocha cljs
