@@ -1,4 +1,4 @@
-(ns matchete.pattern
+(ns matchete.matcher
   (:require [clojure.math.combinatorics :as combo]))
 
 (defn- binding? [P]
@@ -121,9 +121,3 @@
       ([data] (f data {}))
       ([data matches]
        (M matches data)))))
-
-(defn matches [P data]
-  ((matcher P) data))
-
-(defn match? [P data]
-  (boolean (seq (matches P data))))
