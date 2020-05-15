@@ -41,6 +41,7 @@
 (matches '{:x ?n :y ?n} {:x 1 :y 2}) ;; => ()
 
 ;; memo binding is a symbol that starts with '!' is a collection binding to store matched data
+;; item order is not guaranteed
 (matches '{:x !n :y !n} {:x 1 :y 2}) ;; => ({!n [1 2]})
 
 ;; '_' symbol is a placeholder to match anything without binding value

@@ -67,7 +67,7 @@
                       {:foo 1}))))
 
 (deftest memo-binding
-  (is (= [{'!vals [1 2 3 4 5]}]
+  (is (= '[{!vals (5 4 3 2 1)}]
          (sut/matches '{:x !vals
                         :y !vals
                         :z [!vals !vals !vals]}

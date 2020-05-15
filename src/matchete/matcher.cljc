@@ -101,7 +101,7 @@
 
     (memo-binding? P)
     (fn [matches data]
-      (list (update matches P (fnil conj []) data)))
+      (list (update matches P (partial cons data))))
 
     (binding? P)
     (fn [matches data]
