@@ -78,17 +78,24 @@
           exact-MS (map matcher* exact-P)
           tail-M (when (seq tail-P)
                    (matcher* (second tail-P)))]
-      (fn [matches data]
-        (when (and (sequential? data)
-                   (<= (count exact-MS) (count data)))
-          (let [res (reduce
-                     (fn [ms [M data]]
-                       (mapcat #(M % data) ms))
-                     (list matches)
-                     (map vector exact-MS data))]
-            (if tail-M
-              (mapcat #(tail-M % (drop (count exact-MS) data)) res)
-              res)))))))
+      (if (seq tail-P)
+        (fn [matches data]
+          (when (and (sequential? data)
+                     (<= (count exact-MS) (count data)))
+            (let [res (reduce
+                       (fn [ms [M data]]
+                         (mapcat #(M % data) ms))
+                       (list matches)
+                       (map vector exact-MS data))]
+              (mapcat #(tail-M % (drop (count exact-MS) data)) res))))
+        (fn [matches data]
+          (when (and (sequential? data)
+                     (= (count exact-MS) (count data)))
+            (reduce
+             (fn [ms [M data]]
+               (mapcat #(M % data) ms))
+             (list matches)
+             (map vector exact-MS data))))))))
 
 (defn matcher* [P]
   (cond

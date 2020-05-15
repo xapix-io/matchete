@@ -21,7 +21,7 @@
           '[1 "qwe" ?x
             {:x ?x
              collections [1 2 3 ?x]}
-            [1 2 3]
+            [1 2 3 & _]
             [1 2 3 4]
             (cat ?obj {:x ?x
                        :y ?y})
@@ -44,7 +44,9 @@
   (is (not (sut/match? '{:x ?x
                          :y ?x}
                        {:x 1
-                        :y 2}))))
+                        :y 2})))
+  (is (not (sut/match? '[1 2 3 & _]
+                       {:x 1}))))
 
 (deftest failed-cat
   (is (not (sut/match? '{:x ?x
@@ -70,7 +72,7 @@
   (is (= '[{!vals (5 4 3 2 1)}]
          (sut/matches '{:x !vals
                         :y !vals
-                        :z [!vals !vals !vals]}
+                        :z [!vals !vals !vals & _]}
                       {:x 1
                        :y 2
                        :z [3 4 5 6]}))))
@@ -85,3 +87,16 @@
              {?x :z, ?y 3, ?z :x, ?v 1}
              {?x :z, ?y 3, ?z :y, ?v 2})
            (sut/matches M {:x 1 :y 2 :z 3})))))
+
+(sut/pdefn foo
+           ([?x] (+ ?x 1))
+           ([?x {:foo 1 ?n ?n}]
+            [?x ?n]))
+
+(deftest macro-test
+  (is (= [2]
+         (foo 1)))
+  (is (= []
+         (foo 1 2)))
+  (is (= [[1 :bar]]
+         (foo 1 {:foo 1 :bar :bar}))))
