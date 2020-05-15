@@ -22,7 +22,7 @@
             {:x ?x
              collections [1 2 3 ?x]}
             [1 2 3]
-            (exact [1 2 3 4])
+            [1 2 3 4]
             (cat ?obj {:x ?x
                        :y ?y})
             (alt 1 ?x)

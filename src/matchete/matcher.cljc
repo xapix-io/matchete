@@ -1,11 +1,11 @@
 (ns matchete.matcher
   (:require [clojure.math.combinatorics :as combo]))
 
-(defn- binding? [P]
+(defn binding? [P]
   (and (symbol? P)
        (= (first (name P)) \?)))
 
-(defn- memo-binding? [P]
+(defn memo-binding? [P]
   (and (symbol? P)
        (= (first (name P)) \!)))
 
@@ -56,7 +56,7 @@
             (mapcat #(complex-M % complex-data) matches')
             matches'))))))
 
-(defn seq-matcher [P exact?]
+(defn seq-matcher [P]
   (case (first P)
     cat (let [MS (map matcher* (rest P))]
           (fn [matches data]
@@ -74,18 +74,21 @@
                  ms))
              (list matches)
              MS)))
-    exact (seq-matcher (second P) true)
-    (let [MS (map matcher* P)]
+    (let [[exact-P tail-P] (split-with (partial not= '&) P)
+          exact-MS (map matcher* exact-P)
+          tail-M (when (seq tail-P)
+                   (matcher* (second tail-P)))]
       (fn [matches data]
         (when (and (sequential? data)
-                   ((if exact? = <=)
-                    (count MS)
-                    (count data)))
-          (reduce
-           (fn [ms [M data]]
-             (mapcat #(M % data) ms))
-           (list matches)
-           (map vector MS data)))))))
+                   (<= (count exact-MS) (count data)))
+          (let [res (reduce
+                     (fn [ms [M data]]
+                       (mapcat #(M % data) ms))
+                     (list matches)
+                     (map vector exact-MS data))]
+            (if tail-M
+              (mapcat #(tail-M % (drop (count exact-MS) data)) res)
+              res)))))))
 
 (defn matcher* [P]
   (cond
@@ -93,7 +96,7 @@
     (map-matcher P)
 
     (sequential? P)
-    (seq-matcher P false)
+    (seq-matcher P)
 
     (placeholder? P)
     (fn [matches _data]
