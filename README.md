@@ -71,9 +71,9 @@
 ;; by default sequential pattern will match if the matched sequence is not shorter than pattern
 (matches '[?x 42 "qwe"] [:foo 42 "qwe" :tail-element]) ;; => ({?x :foo})
 
-;; wrapping the pattern into control sequence can override this behaviour
-(matches '(exact [?x 42 "qwe"]) [:foo 42 "qwe" :tail-element]) ;; => ()
-(matches '(exact [?x 42 "qwe" :tail-element]) [:foo 42 "qwe" :tail-element]) ;; => ({?x :foo})
+;; to extract and match the tail of sequence it is possible to use '&
+;; This is working as in clojure destructuring pattern
+(matches '[?x ?y & ?z] [1 2 3 4 5]) ;; => ({?x 1 ?y 2 ?z (3 4 5)})
 
 ;; `cat` control sequence can wrap multiple patterns in a subsequence of matches
 (matches '(cat {:id ?id :name ?name} ;; match a map with :id and :role keys
