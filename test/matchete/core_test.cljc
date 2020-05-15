@@ -1,5 +1,6 @@
 (ns matchete.core-test
   (:require [matchete.core :as sut]
+            [matchete.matcher :as m]
             #?(:clj [clojure.test :refer [deftest is]]
                :cljs [cljs.test :refer [deftest is] :include-macros true])))
 
@@ -73,3 +74,14 @@
                       {:x 1
                        :y 2
                        :z [3 4 5 6]}))))
+
+(deftest precompiled-matcher
+  (let [M (m/matcher '{?x ?y
+                       ?z ?v})]
+    (is (= '({?x :x, ?y 1, ?z :y, ?v 2}
+             {?x :x, ?y 1, ?z :z, ?v 3}
+             {?x :y, ?y 2, ?z :x, ?v 1}
+             {?x :y, ?y 2, ?z :z, ?v 3}
+             {?x :z, ?y 3, ?z :x, ?v 1}
+             {?x :z, ?y 3, ?z :y, ?v 2})
+           (sut/matches M {:x 1 :y 2 :z 3})))))
