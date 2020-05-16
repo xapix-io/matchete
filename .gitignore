@@ -10,6 +10,7 @@ pom.xml.asc
 /classes/
 /target/
 /checkouts/
+/out/
 .lein-deps-sum
 .lein-repl-history
 .lein-plugins/
@@ -18,6 +19,7 @@ pom.xml.asc
 .nrepl-history
 .cpcache/
 .clj-kondo/.cache/
+.cljs_node_repl/
 
 ### Emacs ###
 

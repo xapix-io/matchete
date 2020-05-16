@@ -1,0 +1,5 @@
+{:lint-as
+ {matchete.core/pdefn clojure.core/defn}
+ :linters
+ {:unresolved-symbol
+  {:exclude [(matchete.core/pdefn)]}}}
