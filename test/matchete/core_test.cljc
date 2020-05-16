@@ -1,5 +1,5 @@
 (ns matchete.core-test
-  (:require [matchete.core :as sut]
+  (:require [matchete.core :as sut #?@(:cljs (:include-macros true))]
             [matchete.matcher :as m]
             #?(:clj [clojure.test :refer [deftest is]]
                :cljs [cljs.test :refer [deftest is] :include-macros true])))
