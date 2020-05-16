@@ -88,10 +88,9 @@
              {?x :z, ?y 3, ?z :y, ?v 2})
            (sut/matches M {:x 1 :y 2 :z 3})))))
 
-(sut/pdefn foo
-           ([?x] (+ ?x 1))
-           ([?x {:foo 1 ?n ?n}]
-            [?x ?n]))
+(sut/defn-match foo
+   ([?x]                (+ ?x 1))
+   ([?x {:foo 1 ?n ?n}] [?x ?n]))
 
 (deftest macro-test
   (is (= [2]

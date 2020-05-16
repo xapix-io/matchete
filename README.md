@@ -84,11 +84,11 @@
           :role :admin
           :company "X"})
 ;; => ({?id 1
-        ?name "Dave"
-        ?user {:id 1
-               :name "Dave"
-               :role :admin
-               :company "X"}})
+;;      ?name "Dave"
+;;      ?user {:id 1
+;;             :name "Dave"
+;;             :role :admin
+;;             :company "X"}})
 
 ;; `alt` control sequence
 (matches '(alt {:x ?x} {:y ?x} {:z ?x})

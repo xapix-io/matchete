@@ -23,7 +23,7 @@
 (defn match? [pattern data]
   (boolean (seq (matches pattern data))))
 
-(defmacro pdefn* [s body]
+(defmacro defn* [s body]
   (when (seq body)
     (let [[[P expr-body] & body] body
           vars (vec (find-vars P))]
@@ -31,9 +31,9 @@
          (if sm#
            (for [{:syms ~vars} sm#]
              ~expr-body)
-           (pdefn* ~s ~body))))))
+           (defn* ~s ~body))))))
 
-(defmacro pdefn [name & body]
+(defmacro defn-match [name & fdecl]
   (let [args-s (gensym)]
     `(defn ~name [& ~args-s]
-       (pdefn* ~args-s ~body))))
+       (defn* ~args-s ~fdecl))))
