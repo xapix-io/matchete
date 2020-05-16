@@ -15,7 +15,7 @@
 (defn- pattern? [P]
   (or (binding? P)
       (and (sequential? P)
-           (contains? #{'cat 'alt 'exact} (first P)))))
+           (contains? #{'cat 'alt} (first P)))))
 
 (declare matcher*)
 

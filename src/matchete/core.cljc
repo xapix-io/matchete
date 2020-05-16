@@ -1,15 +1,19 @@
 (ns matchete.core
-  (:require [matchete.matcher :as m]
-            [clojure.walk :as walk]))
+  (:require [matchete.matcher :as m]))
 
 (defn- find-vars [P]
-  (let [vars (atom #{})]
-    (walk/postwalk (fn [x]
-                     (when (or (m/binding? x) (m/memo-binding? x))
-                       (swap! vars conj x))
-                     x)
-                   P)
-    (vec @vars)))
+  (cond
+    (or (m/binding? P)
+        (m/memo-binding? P))
+    (list P)
+
+    (sequential? P)
+    (mapcat find-vars P)
+
+    (map? P)
+    (mapcat find-vars (seq P))
+
+    :else ()))
 
 (defn matches [pattern data]
   (if (fn? pattern)
@@ -22,7 +26,7 @@
 (defmacro pdefn* [s body]
   (when (seq body)
     (let [[[P expr-body] & body] body
-          vars (find-vars P)]
+          vars (vec (find-vars P))]
       `(let [sm# (matches (quote ~P) ~s)]
          (if sm#
            (for [{:syms ~vars} sm#]
