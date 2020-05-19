@@ -23,17 +23,62 @@
 (defn match? [pattern data]
   (boolean (seq (matches pattern data))))
 
-(defmacro defn* [s body]
-  (when (seq body)
+(defmacro defn* [patterns s body]
+  (if (seq body)
     (let [[[P expr-body] & body] body
           vars (vec (find-vars P))]
       `(let [sm# (matches (quote ~P) ~s)]
-         (if sm#
+         (if (seq sm#)
            (for [{:syms ~vars} sm#]
              ~expr-body)
-           (defn* ~s ~body))))))
+           (defn* ~patterns ~s ~body))))
+    `(throw (ex-info "Can not find declaration that satisfy the arguments" {:arguments ~s
+                                                                            :patterns (quote ~patterns)}))))
 
-(defmacro defn-match [name & fdecl]
-  (let [args-s (gensym)]
-    `(defn ~name [& ~args-s]
-       (defn* ~args-s ~fdecl))))
+(defmacro fn-match
+  ""
+  {:arglists '([name? [param-patterns* ] exprs*]
+               [name? ([param-patterns* ] exprs* )+ ])}
+  [& sigs]
+  (let [name (if (symbol? (first sigs)) (list (first sigs)) ())
+        sigs (if (seq name) (next sigs) sigs)
+        sigs (if (vector? (first sigs))
+               (list sigs)
+               (if (seq? (first sigs))
+                 sigs
+                 (throw (ex-info "Parameter declaration is missing or not a vector" {:form sigs}))))
+        patterns (map first sigs)
+        args-s (gensym)]
+    (with-meta
+      `(fn ~@name [& ~args-s]
+         (defn* ~patterns ~args-s ~sigs))
+      (meta &form))))
+
+(defmacro defn-match
+  ""
+  {:arglists '([name doc-string? attr-map? [param-patterns*] exprs* ]
+               [name doc-string? attr-map? ([param-patterns*] exprs* )+ ])}
+  [name & fdecl]
+  (let [m (if (string? (first fdecl))
+            {:doc (first fdecl)}
+            {})
+        fdecl (if (string? (first fdecl))
+                (next fdecl)
+                fdecl)
+        m (if (map? (first fdecl))
+            (conj m (first fdecl))
+            m)
+        fdecl (if (map? (first fdecl))
+                (next fdecl)
+                fdecl)
+        fdecl (if (vector? (first fdecl))
+                (list fdecl)
+                fdecl)
+        m (if (map? (last fdecl))
+            (conj m (last fdecl))
+            m)
+        fdecl (if (map? (last fdecl))
+                (butlast fdecl)
+                fdecl)]
+    (list 'def (with-meta name m)
+          (cons `fn-match fdecl))))

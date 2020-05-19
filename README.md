@@ -68,8 +68,11 @@
 ## Control sequence
 
 ```clojure
-;; by default sequential pattern will match if the matched sequence is not shorter than pattern
-(matches '[?x 42 "qwe"] [:foo 42 "qwe" :tail-element]) ;; => ({?x :foo})
+;; by default sequential pattern will match if the matched sequence has the same length as the pattern
+(match? '[?x 42 "qwe"] [:foo 42 "qwe" :tail-element]) ;; => false
+
+;; tail matcher can be added to the end of the pattern to override this behaviour
+(match? '[?x 42 "qwe" & _] [:foo 42 "qwe" :tail-element]) ;; => true
 
 ;; to extract and match the tail of sequence it is possible to use '&
 ;; This is working as in clojure destructuring pattern
@@ -96,4 +99,27 @@
          ;; {:y 2} ;; => ({?x 2})
          {:z 3} ;; => ({?x 3})
          )
+```
+
+## Functions with pattern-matching dispatch
+
+```clojure
+;; `defn-match` and `fn-match` macros can be used to create a function with pattern-based dispatch
+;; they are similar to their clojure siblings `defn` and `fn`
+;; there are two main difference:
+;;   * result is always a list with zero or many elements
+;;   * patterns checked from top to bottom and the first not empty results of applying `matches` function will be used to create local bindings to run the body associated with that pattern
+
+(defn-match foo
+  ([0] 1)
+  ([1] 0)
+  ([{?x 1}] (first (foo ?x)))
+  ([?x] (str "this is X: " ?x)))
+
+(foo 0) ;; => (1)
+(foo 1) ;; => (0)
+(foo "`I'm X`") ;; => ("this is X: `I'm X`")
+(foo {"I'm X" 1
+      "I'm also X" 1}) ;; => ("this is X: I'm X" "this is X: I'm also X")
+
 ```
