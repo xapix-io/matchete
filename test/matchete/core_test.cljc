@@ -2,7 +2,8 @@
   (:require [matchete.core :as sut #?@(:cljs (:include-macros true))]
             [matchete.matcher :as m]
             #?(:clj [clojure.test :refer [deftest is]]
-               :cljs [cljs.test :refer [deftest is] :include-macros true])))
+               :cljs [cljs.test :refer [deftest is] :include-macros true]))
+  #?(:clj (:import (clojure.lang ExceptionInfo))))
 
 (deftest core-test
   (is (= '({?x :x
@@ -95,7 +96,13 @@
 (deftest macro-test
   (is (= [2]
          (foo 1)))
-  (is (= []
-         (foo 1 2)))
+  (is (thrown-with-msg? ExceptionInfo
+                        #"Can not find declaration that satisfy the arguments"
+                        (foo 1 2)))
+  (is (try
+        (foo 1 2)
+        (catch ExceptionInfo e
+          (is (= {:arguments [1 2], :patterns '([?x] [?x {:foo 1, ?n ?n}])}
+                 (ex-data e))))))
   (is (= [[1 :bar]]
          (foo 1 {:foo 1 :bar :bar}))))
