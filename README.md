@@ -1,5 +1,7 @@
 # matchete
 
+Yet another pattern matching library for Clojure(Script).
+
 ## Data as a pattern
 
 ```clojure
@@ -121,5 +123,4 @@
 (foo "`I'm X`") ;; => ("this is X: `I'm X`")
 (foo {"I'm X" 1
       "I'm also X" 1}) ;; => ("this is X: I'm X" "this is X: I'm also X")
-
 ```
