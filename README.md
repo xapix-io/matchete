@@ -39,7 +39,7 @@ Yet another pattern matching library for Clojure(Script).
 ;; symbol in pattern is a logical variable to extract values from matched data
 (matches '{:x x :y y} {:x 1 :y 2}) ;; => ({x 1 y 2})
 
-(matches '{:x n :y?n} {:x 1 :y 1}) ;; => ({n 1})
+(matches '{:x n :y n} {:x 1 :y 1}) ;; => ({n 1})
 (matches '{:x n :y n} {:x 1 :y 2}) ;; => ()
 
 ;; '_' symbol is a placeholder to match anything without binding value
