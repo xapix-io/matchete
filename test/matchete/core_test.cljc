@@ -6,32 +6,32 @@
   #?(:clj (:import (clojure.lang ExceptionInfo))))
 
 (deftest core-test
-  (is (= '({?x :x
-            ?y :y
-            ?obj {:x :x
+  (is (= '({x :x
+            y :y
+            obj {:x :x
                   :y :y}
-            ?k 1
-            ?v 1}
-           {?x :x
-            ?y :y
-            ?obj {:x :x
+            k 1
+            v 1}
+           {x :x
+            y :y
+            obj {:x :x
                   :y :y}
-            ?k 4
-            ?v 4})
+            k 4
+            v 4})
          (sut/matches
-          '[1 "qwe" ?x
-            {:x ?x
-             collections [1 2 3 ?x]}
+          '[1 "qwe" x
+            {:x x
+             :collections [1 2 3 x]}
             [1 2 3 & _]
             [1 2 3 4]
-            (cat ?obj {:x ?x
-                       :y ?y})
-            (alt 1 ?x)
-            {?k ?v}
+            (and-chain obj {:x x
+                            :y y})
+            (or-chain 1 x)
+            {k v}
             _]
           [1 "qwe" :x
            {:x :x
-            'collections [1 2 3 :x]}
+            :collections [1 2 3 :x]}
            [1 2 3 4]
            [1 2 3 4]
            {:x :x
@@ -42,16 +42,16 @@
            :not-bind]))))
 
 (deftest failed-binding
-  (is (not (sut/match? '{:x ?x
-                         :y ?x}
+  (is (not (sut/match? '{:x x
+                         :y x}
                        {:x 1
                         :y 2})))
   (is (not (sut/match? '[1 2 3 & _]
                        {:x 1}))))
 
-(deftest failed-cat
-  (is (not (sut/match? '{:x ?x
-                         :y (cat ?y ?x)}
+(deftest failed-and-chain
+  (is (not (sut/match? '{:x x
+                         :y (and-chain y x)}
                        {:x 1
                         :y 2}))))
 
@@ -65,28 +65,19 @@
                        {:x 1}))))
 
 (deftest pattern-as-a-key
-  (is (= [{'?key :foo}]
-         (sut/matches '{(cat ?key :foo) 1}
+  (is (= [{'key :foo}]
+         (sut/matches '{(and-chain key :foo) 1}
                       {:foo 1}))))
 
-(deftest memo-binding
-  (is (= '[{!vals (5 4 3 2 1)}]
-         (sut/matches '{:x !vals
-                        :y !vals
-                        :z [!vals !vals !vals & _]}
-                      {:x 1
-                       :y 2
-                       :z [3 4 5 6]}))))
-
 (deftest precompiled-matcher
-  (let [M (m/matcher '{?x ?y
-                       ?z ?v})]
-    (is (= '({?x :x, ?y 1, ?z :y, ?v 2}
-             {?x :x, ?y 1, ?z :z, ?v 3}
-             {?x :y, ?y 2, ?z :x, ?v 1}
-             {?x :y, ?y 2, ?z :z, ?v 3}
-             {?x :z, ?y 3, ?z :x, ?v 1}
-             {?x :z, ?y 3, ?z :y, ?v 2})
+  (let [M (m/matcher '{x y
+                       z v})]
+    (is (= '({x :x, y 1, z :y, v 2}
+             {x :x, y 1, z :z, v 3}
+             {x :y, y 2, z :x, v 1}
+             {x :y, y 2, z :z, v 3}
+             {x :z, y 3, z :x, v 1}
+             {x :z, y 3, z :y, v 2})
            (sut/matches M {:x 1 :y 2 :z 3})))))
 
 (sut/defn-match foo

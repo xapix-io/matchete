@@ -1,10 +1,10 @@
 (ns matchete.core
   (:require [matchete.matcher :as m]))
 
-(defn- find-vars [P]
+(defn find-vars [P]
   (cond
-    (or (m/binding? P)
-        (m/memo-binding? P))
+    (and (symbol? P)
+         (not= '_ P))
     (list P)
 
     (sequential? P)
@@ -22,6 +22,8 @@
 
 (defn match? [pattern data]
   (boolean (seq (matches pattern data))))
+
+(def matcher m/matcher)
 
 (defmacro defn* [patterns s body]
   (if (seq body)

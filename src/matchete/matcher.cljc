@@ -1,21 +1,10 @@
 (ns matchete.matcher
   (:require [clojure.math.combinatorics :as combo]))
 
-(defn binding? [P]
-  (and (symbol? P)
-       (= (first (name P)) \?)))
-
-(defn memo-binding? [P]
-  (and (symbol? P)
-       (= (first (name P)) \!)))
-
-(defn- placeholder? [P]
-  (= '_ P))
-
 (defn- pattern? [P]
-  (or (binding? P)
+  (or (symbol? P)
       (and (sequential? P)
-           (contains? #{'cat 'alt} (first P)))))
+           (contains? #{'and 'or} (first P)))))
 
 (declare matcher*)
 
@@ -40,9 +29,7 @@
                         (combo/selections data (count P))))))))
 
 (defn map-matcher [P]
-  (let [{simple-keys false
-         complex-keys true}
-        (group-by pattern? (keys P))
+  (let [{simple-keys false complex-keys true} (group-by pattern? (keys P))
         simple-P (select-keys P simple-keys)
         simple-M (simple-map-matcher simple-P)
         complex-P (not-empty (select-keys P complex-keys))
@@ -57,45 +44,28 @@
             matches'))))))
 
 (defn seq-matcher [P]
-  (case (first P)
-    cat (let [MS (map matcher* (rest P))]
-          (fn [matches data]
-            (reduce
-             (fn [ms M]
-               (or (seq (mapcat #(M % data) ms)) (reduced ())))
-             (list matches)
-             MS)))
-    alt (let [MS (map matcher* (rest P))]
-          (fn [matches data]
-            (reduce
-             (fn [ms M]
-               (if-let [ms (seq (mapcat #(M % data) ms))]
-                 (reduced ms)
-                 ms))
-             (list matches)
-             MS)))
-    (let [[exact-P tail-P] (split-with (partial not= '&) P)
-          exact-MS (map matcher* exact-P)
-          tail-M (when (seq tail-P)
-                   (matcher* (second tail-P)))]
-      (if (seq tail-P)
-        (fn [matches data]
-          (when (and (sequential? data)
-                     (<= (count exact-MS) (count data)))
-            (let [res (reduce
-                       (fn [ms [M data]]
-                         (mapcat #(M % data) ms))
-                       (list matches)
-                       (map vector exact-MS data))]
-              (mapcat #(tail-M % (drop (count exact-MS) data)) res))))
-        (fn [matches data]
-          (when (and (sequential? data)
-                     (= (count exact-MS) (count data)))
-            (reduce
-             (fn [ms [M data]]
-               (mapcat #(M % data) ms))
-             (list matches)
-             (map vector exact-MS data))))))))
+  (let [[exact-P tail-P] (split-with (partial not= '&) P)
+        exact-MS (map matcher* exact-P)
+        tail-M (when (seq tail-P)
+                 (matcher* (second tail-P)))]
+    (if (seq tail-P)
+      (fn [matches data]
+        (when (and (sequential? data)
+                   (<= (count exact-MS) (count data)))
+          (let [res (reduce
+                     (fn [ms [M data]]
+                       (mapcat #(M % data) ms))
+                     (list matches)
+                     (map vector exact-MS data))]
+            (mapcat #(tail-M % (drop (count exact-MS) data)) res))))
+      (fn [matches data]
+        (when (and (sequential? data)
+                   (= (count exact-MS) (count data)))
+          (reduce
+           (fn [ms [M data]]
+             (mapcat #(M % data) ms))
+           (list matches)
+           (map vector exact-MS data)))))))
 
 (defn matcher* [P]
   (cond
@@ -103,17 +73,34 @@
     (map-matcher P)
 
     (sequential? P)
-    (seq-matcher P)
+    (case (first P)
+      and
+      (let [MS (map matcher* (rest P))]
+        (fn [matches data]
+          (reduce
+           (fn [ms M]
+             (or (seq (mapcat #(M % data) ms)) (reduced ())))
+           (list matches)
+           MS)))
 
-    (placeholder? P)
+      or
+      (let [MS (map matcher* (rest P))]
+        (fn [matches data]
+          (reduce
+           (fn [ms M]
+             (if-let [ms (seq (mapcat #(M % data) ms))]
+               (reduced ms)
+               ms))
+           (list matches)
+           MS)))
+
+      (seq-matcher P))
+
+    (= '_ P)
     (fn [matches _data]
       (list matches))
 
-    (memo-binding? P)
-    (fn [matches data]
-      (list (update matches P (partial cons data))))
-
-    (binding? P)
+    (symbol? P)
     (fn [matches data]
       (if (contains? matches P)
         (or (and (= data (matches P)) (list matches)) ())
