@@ -24,9 +24,9 @@
              :collections [1 2 3 x]}
             [1 2 3 & _]
             [1 2 3 4]
-            (and-chain obj {:x x
+            (and obj {:x x
                             :y y})
-            (or-chain 1 x)
+            (or 1 x)
             {k v}
             _]
           [1 "qwe" :x
@@ -49,9 +49,9 @@
   (is (not (sut/match? '[1 2 3 & _]
                        {:x 1}))))
 
-(deftest failed-and-chain
+(deftest failed-and
   (is (not (sut/match? '{:x x
-                         :y (and-chain y x)}
+                         :y (and y x)}
                        {:x 1
                         :y 2}))))
 
@@ -66,7 +66,7 @@
 
 (deftest pattern-as-a-key
   (is (= [{'key :foo}]
-         (sut/matches '{(and-chain key :foo) 1}
+         (sut/matches '{(and key :foo) 1}
                       {:foo 1}))))
 
 (deftest precompiled-matcher
