@@ -96,7 +96,13 @@
                       {:foo {:bar {:baz 42
                                    :zab 24}}
                        :array [{:x 1}
-                               {:x 42}]})))
+                               {:x 42}]})
+         ((sut/matcher '$path-to-42)
+          {} {'$path-to-42 (sut/matcher '(scan-indexed !path (or $path-to-42 42)))}
+          {:foo {:bar {:baz 42
+                       :zab 24}}
+           :array [{:x 1}
+                   {:x 42}]})))
 
   (is (thrown-with-msg? ExceptionInfo
                         #"Undefined rule"
