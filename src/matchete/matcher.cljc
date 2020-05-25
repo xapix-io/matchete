@@ -93,24 +93,36 @@
     (sequential? P)
     (case (first P)
       and
-      (let [MS (map matcher* (rest P))]
-        (fn [matches data]
-          (reduce
-           (fn [ms M]
-             (or (seq (mapcat #(M % data) ms)) (reduced ())))
-           (list matches)
-           MS)))
+      (if (> (count (rest P)) 1)
+        (let [MS (map matcher* (rest P))]
+          (fn [matches data]
+            (reduce
+             (fn [ms M]
+               (or (seq (mapcat #(M % data) ms)) (reduced ())))
+             (list matches)
+             MS)))
+        (throw (ex-info "`and` expect more than one pattern" {:pattern P})))
 
       or
-      (let [MS (map matcher* (rest P))]
-        (fn [matches data]
-          (reduce
-           (fn [ms M]
-             (if-let [ms (seq (mapcat #(M % data) ms))]
-               (reduced ms)
-               ms))
-           (list matches)
-           MS)))
+      (if (> (count (rest P)) 1)
+        (let [MS (map matcher* (rest P))]
+          (fn [matches data]
+            (reduce
+             (fn [ms M]
+               (if-let [ms (seq (mapcat #(M % data) ms))]
+                 (reduced ms)
+                 ms))
+             (list matches)
+             MS)))
+        (throw (ex-info "`or` expect more than one pattern" {:pattern P})))
+
+      scan
+      (if (= 1 (count (rest P)))
+        (let [M (matcher* (second P))]
+          (fn [matches data]
+            (when (sequential? data)
+              (mapcat #(M matches %) data))))
+        (throw (ex-info "`scan` expect exactly one pattern" {:pattern P})))
 
       (seq-matcher P))
 
@@ -121,7 +133,9 @@
     (binding? P)
     (fn [matches data]
       (if (contains? matches P)
-        (or (and (= data (matches P)) (list matches)) ())
+        (if (= data (get matches P))
+          (list matches)
+          ())
         (list (assoc matches P data))))
 
     (memo-binding? P)
@@ -137,6 +151,6 @@
 (defn matcher [P]
   (let [M (matcher* P)]
     (fn f
-      ([data] (f data {}))
-      ([data matches]
-       (M matches data)))))
+      ([data] (f {} data))
+      ([matches data]
+       (set (M matches data))))))

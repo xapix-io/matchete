@@ -6,18 +6,18 @@
   #?(:clj (:import (clojure.lang ExceptionInfo))))
 
 (deftest core-test
-  (is (= '({?x :x
-            ?y :y
-            ?obj {:x :x
-                  :y :y}
-            ?k 1
-            ?v 1}
-           {?x :x
-            ?y :y
-            ?obj {:x :x
-                  :y :y}
-            ?k 4
-            ?v 4})
+  (is (= #{'{?x :x
+             ?y :y
+             ?obj {:x :x
+                   :y :y}
+             ?k 1
+             ?v 1}
+           '{?x :x
+             ?y :y
+             ?obj {:x :x
+                   :y :y}
+             ?k 4
+             ?v 4}}
          (sut/matches
           '[1 "qwe" ?x
             {:x ?x
@@ -42,10 +42,26 @@
            :not-bind]))))
 
 (deftest memo-binding
-  (is (= '[{!foo [1 3]
-            !bar [2 4]}]
+  (is (= #{'{!foo [1 3]
+             !bar [2 4]}}
          (sut/matches '[!foo !bar !foo !bar]
                       [1 2 3 4]))))
+
+(deftest scan-pattern
+  (is (= #{}
+         (sut/matches '(scan {:foo ?x})
+                      [{:bar 1} {:bar 2}])
+         (sut/matches '(scan {:foo ?x})
+                      {:foo 1})))
+  (is (= #{'{?x 1}}
+         (sut/matches '(scan {:foo ?x})
+                      [{:foo 1}])))
+  (is (= #{'{?x 1}
+           '{?x 2}}
+         (sut/matches '(scan {:foo ?x})
+                      [{:foo 1}
+                       {}
+                       {:foo 2}]))))
 
 (deftest failed-binding
   (is (not (sut/match? '{:x ?x
@@ -71,19 +87,19 @@
                        {:x 1}))))
 
 (deftest pattern-as-a-key
-  (is (= '[{?key :foo}]
+  (is (= #{'{?key :foo}}
          (sut/matches '{?key 1}
                       {:foo 1}))))
 
 (deftest precompiled-matcher
   (let [M (m/matcher '{?x ?y
                        ?z ?v})]
-    (is (= '({?x :x, ?y 1, ?z :y, ?v 2}
-             {?x :x, ?y 1, ?z :z, ?v 3}
-             {?x :y, ?y 2, ?z :x, ?v 1}
-             {?x :y, ?y 2, ?z :z, ?v 3}
-             {?x :z, ?y 3, ?z :x, ?v 1}
-             {?x :z, ?y 3, ?z :y, ?v 2})
+    (is (= #{'{?x :x, ?y 1, ?z :y, ?v 2}
+             '{?x :x, ?y 1, ?z :z, ?v 3}
+             '{?x :y, ?y 2, ?z :x, ?v 1}
+             '{?x :y, ?y 2, ?z :z, ?v 3}
+             '{?x :z, ?y 3, ?z :x, ?v 1}
+             '{?x :z, ?y 3, ?z :y, ?v 2}}
            (sut/matches M {:x 1 :y 2 :z 3})))))
 
 (deftest incorrect-tail-pattern
@@ -94,6 +110,36 @@
     (sut/matcher '[?x & ?y ?z])
     (catch ExceptionInfo e
       (is (= {:pattern '(?y ?z)}
+             (ex-data e))))))
+
+(deftest incorrect-or-pattern
+  (is (thrown-with-msg? ExceptionInfo
+                        #"`or` expect more than one pattern"
+                        (sut/matcher '(or ?x))))
+  (try
+    (sut/matcher '(or ?x))
+    (catch ExceptionInfo e
+      (is (= {:pattern '(or ?x)}
+             (ex-data e))))))
+
+(deftest incorrect-and-pattern
+  (is (thrown-with-msg? ExceptionInfo
+                        #"`and` expect more than one pattern"
+                        (sut/matcher '(and ?x))))
+  (try
+    (sut/matcher '(and ?x))
+    (catch ExceptionInfo e
+      (is (= {:pattern '(and ?x)}
+             (ex-data e))))))
+
+(deftest incorrect-scan-pattern
+  (is (thrown-with-msg? ExceptionInfo
+                        #"`scan` expect exactly one pattern"
+                        (sut/matcher '(scan ?x ?y))))
+  (try
+    (sut/matcher '(scan ?x ?y))
+    (catch ExceptionInfo e
+      (is (= {:pattern '(scan ?x ?y)}
              (ex-data e))))))
 
 (sut/defn-match foo
