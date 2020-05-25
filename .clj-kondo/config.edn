@@ -1,7 +1,10 @@
 {:lint-as
- {matchete.core/defn-match clojure.core/defn}
+ {matchete.core/defn-match clojure.core/defn
+  matchete.core/fn-match clojure.core/fn}
  :linters
  {:unresolved-symbol
-  {:exclude [(matchete.core/defn-match)]}
+  {:exclude [(matchete.core/defn-match)
+             (matchete.core/fn-match)]}
   :unsupported-binding-form
-  {:exclude [(matchete.core/defn-match)]}}}
+  {:exclude [(matchete.core/defn-match)
+             (matchete.core/fn-match)]}}}

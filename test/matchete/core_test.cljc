@@ -81,6 +81,35 @@
                        1 2
                        2 3}))))
 
+(deftest rule-tests
+  (is (= #{'{!path [:array 1 :x]}
+           '{!path [:foo :bar :baz]}}
+         (sut/matches '(scan-indexed !path
+                                     (scan-indexed !path
+                                                   (scan-indexed !path 42)))
+                      {:foo {:bar {:baz 42
+                                   :zab 24}}
+                       :array [{:x 1}
+                               {:x 42}]})
+         (sut/matches '(rule $path-to-42
+                             (scan-indexed !path (or $path-to-42 42)))
+                      {:foo {:bar {:baz 42
+                                   :zab 24}}
+                       :array [{:x 1}
+                               {:x 42}]})))
+
+  (is (thrown-with-msg? ExceptionInfo
+                        #"Undefined rule"
+                        (sut/matches '(scan $rule)
+                                     [1 2 3])))
+
+  (try
+    (sut/matches '(scan $rule)
+                 [1 2 3])
+    (catch ExceptionInfo e
+      (is (= {:rule '$rule}
+             (ex-data e))))))
+
 (deftest failed-binding
   (is (not (sut/match? '{:x ?x
                          :y ?x}
@@ -186,4 +215,9 @@
           (is (= {:arguments [1 2], :patterns '([?x] [?x {:foo 1, ?n ?n}])}
                  (ex-data e))))))
   (is (= [[1 :bar]]
-         (foo 1 {:foo 1 :bar :bar}))))
+         (foo 1 {:foo 1 :bar :bar})))
+
+  (let [f (sut/fn-match foo
+            ([?x]                (+ ?x 1))
+            ([?x {:foo 1 ?n ?n}] [?x ?n]))]
+    (is (= [2] (f 1)))))

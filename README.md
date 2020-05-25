@@ -25,10 +25,9 @@ Yet another pattern matching library for Clojure(Script).
 
 ;; sequential matchers
 ;; elements in sequence are matches while element present in sequence
-(match? [1 2 3] [1 2 3 42]) ;; => true, because first three elements in vector matches pattern
 (match? [1 2 3] [1 2]) ;; => false, because pattern require third element to match against 3
 
-;; same for hash maps
+;; hash maps
 (match? {:x 1} {:x 1 :y 2}) ;; => true
 (match? {:x 1 :y 2} {:x 1}) ;; => false
 ```
