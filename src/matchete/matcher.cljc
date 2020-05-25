@@ -124,6 +124,22 @@
               (mapcat #(M matches %) data))))
         (throw (ex-info "`scan` expect exactly one pattern" {:pattern P})))
 
+      scan-indexed
+      (if (= 2 (count (rest P)))
+        (let [M (matcher* (rest P))]
+          (fn [matches data]
+            (cond
+              (sequential? data)
+              (apply concat
+                     (map-indexed
+                      (fn [i v]
+                        (M matches [i v]))
+                      data))
+
+              (map? data)
+              (mapcat #(M matches %) data))))
+        (throw (ex-info "`scan-indexed` expect exactly two patterns" {:pattern P})))
+
       (seq-matcher P))
 
     (= '_ P)

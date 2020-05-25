@@ -63,6 +63,24 @@
                        {}
                        {:foo 2}]))))
 
+(deftest scan-indexed-pattern
+  (is (= #{}
+         (sut/matches '(scan-indexed ?index ?data)
+                      [])
+         (sut/matches '(scan-indexed ?index ?data)
+                      {})
+         (sut/matches '(scan-indexed ?index ?data)
+                      42)))
+  (is (= #{'{?index 1 ?data 2}
+           '{?index 0 ?data 1}
+           '{?index 2 ?data 3}}
+         (sut/matches '(scan-indexed ?index ?data)
+                      [1 2 3])
+         (sut/matches '(scan-indexed ?index ?data)
+                      {0 1
+                       1 2
+                       2 3}))))
+
 (deftest failed-binding
   (is (not (sut/match? '{:x ?x
                          :y ?x}
@@ -140,6 +158,16 @@
     (sut/matcher '(scan ?x ?y))
     (catch ExceptionInfo e
       (is (= {:pattern '(scan ?x ?y)}
+             (ex-data e))))))
+
+(deftest incorrect-scan-indexed-pattern
+  (is (thrown-with-msg? ExceptionInfo
+                        #"`scan-indexed` expect exactly two patterns"
+                        (sut/matcher '(scan-indexed ?x ?y ?z))))
+  (try
+    (sut/matcher '(scan-indexed ?x ?y ?z))
+    (catch ExceptionInfo e
+      (is (= {:pattern '(scan-indexed ?x ?y ?z)}
              (ex-data e))))))
 
 (sut/defn-match foo
