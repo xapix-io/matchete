@@ -1,20 +1,6 @@
 (ns matchete.core
   (:require [matchete.matcher :as m]))
 
-(defn find-vars [P]
-  (cond
-    (and (symbol? P)
-         (not= '_ P))
-    (list P)
-
-    (sequential? P)
-    (mapcat find-vars P)
-
-    (map? P)
-    (mapcat find-vars (seq P))
-
-    :else ()))
-
 (defn matches [pattern data]
   (if (fn? pattern)
     (pattern data)
@@ -28,7 +14,7 @@
 (defmacro defn* [patterns s body]
   (if (seq body)
     (let [[[P expr-body] & body] body
-          vars (vec (find-vars P))]
+          vars (vec (m/find-bindings P))]
       `(let [sm# (matches (quote ~P) ~s)]
          (if (seq sm#)
            (for [{:syms ~vars} sm#]

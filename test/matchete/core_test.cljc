@@ -6,28 +6,28 @@
   #?(:clj (:import (clojure.lang ExceptionInfo))))
 
 (deftest core-test
-  (is (= '({x :x
-            y :y
-            obj {:x :x
+  (is (= '({?x :x
+            ?y :y
+            ?obj {:x :x
                   :y :y}
-            k 1
-            v 1}
-           {x :x
-            y :y
-            obj {:x :x
+            ?k 1
+            ?v 1}
+           {?x :x
+            ?y :y
+            ?obj {:x :x
                   :y :y}
-            k 4
-            v 4})
+            ?k 4
+            ?v 4})
          (sut/matches
-          '[1 "qwe" x
-            {:x x
-             :collections [1 2 3 x]}
+          '[1 "qwe" ?x
+            {:x ?x
+             :collections [1 2 3 ?x]}
             [1 2 3 & _]
             [1 2 3 4]
-            (and obj {:x x
-                            :y y})
-            (or 1 x)
-            {k v}
+            (and ?obj {:x ?x
+                       :y ?y})
+            (or 1 ?x)
+            {?k ?v}
             _]
           [1 "qwe" :x
            {:x :x
@@ -41,17 +41,23 @@
             4 4}
            :not-bind]))))
 
+(deftest memo-binding
+  (is (= '[{!foo [1 3]
+            !bar [2 4]}]
+         (sut/matches '[!foo !bar !foo !bar]
+                      [1 2 3 4]))))
+
 (deftest failed-binding
-  (is (not (sut/match? '{:x x
-                         :y x}
+  (is (not (sut/match? '{:x ?x
+                         :y ?x}
                        {:x 1
                         :y 2})))
   (is (not (sut/match? '[1 2 3 & _]
                        {:x 1}))))
 
 (deftest failed-and
-  (is (not (sut/match? '{:x x
-                         :y (and y x)}
+  (is (not (sut/match? '{:x ?x
+                         :y (and ?y ?x)}
                        {:x 1
                         :y 2}))))
 
@@ -65,20 +71,30 @@
                        {:x 1}))))
 
 (deftest pattern-as-a-key
-  (is (= [{'key :foo}]
-         (sut/matches '{(and key :foo) 1}
+  (is (= '[{?key :foo}]
+         (sut/matches '{?key 1}
                       {:foo 1}))))
 
 (deftest precompiled-matcher
-  (let [M (m/matcher '{x y
-                       z v})]
-    (is (= '({x :x, y 1, z :y, v 2}
-             {x :x, y 1, z :z, v 3}
-             {x :y, y 2, z :x, v 1}
-             {x :y, y 2, z :z, v 3}
-             {x :z, y 3, z :x, v 1}
-             {x :z, y 3, z :y, v 2})
+  (let [M (m/matcher '{?x ?y
+                       ?z ?v})]
+    (is (= '({?x :x, ?y 1, ?z :y, ?v 2}
+             {?x :x, ?y 1, ?z :z, ?v 3}
+             {?x :y, ?y 2, ?z :x, ?v 1}
+             {?x :y, ?y 2, ?z :z, ?v 3}
+             {?x :z, ?y 3, ?z :x, ?v 1}
+             {?x :z, ?y 3, ?z :y, ?v 2})
            (sut/matches M {:x 1 :y 2 :z 3})))))
+
+(deftest incorrect-tail-pattern
+  (is (thrown-with-msg? ExceptionInfo
+                        #"Destructuring of a sequence tail must be a single pattern"
+                        (sut/matcher '[?x & ?y ?z])))
+  (try
+    (sut/matcher '[?x & ?y ?z])
+    (catch ExceptionInfo e
+      (is (= {:pattern '(?y ?z)}
+             (ex-data e))))))
 
 (sut/defn-match foo
    ([?x]                (+ ?x 1))

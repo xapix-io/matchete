@@ -1,10 +1,26 @@
 (ns matchete.matcher
   (:require [clojure.math.combinatorics :as combo]))
 
-(defn- pattern? [P]
-  (or (symbol? P)
-      (and (sequential? P)
-           (contains? #{'and 'or} (first P)))))
+(defn binding? [P]
+  (and (simple-symbol? P)
+       (= \? (first (name P)))))
+
+(defn memo-binding? [P]
+  (and (simple-symbol? P)
+       (= \! (first (name P)))))
+
+(defn find-bindings [P]
+  (cond
+    ((some-fn binding? memo-binding?) P)
+    (list P)
+
+    (sequential? P)
+    (mapcat find-bindings P)
+
+    (map? P)
+    (mapcat find-bindings (seq P))
+
+    :else ()))
 
 (declare matcher*)
 
@@ -29,7 +45,7 @@
                         (combo/selections data (count P))))))))
 
 (defn map-matcher [P]
-  (let [{simple-keys false complex-keys true} (group-by pattern? (keys P))
+  (let [{simple-keys false complex-keys true} (group-by binding? (keys P))
         simple-P (select-keys P simple-keys)
         simple-M (simple-map-matcher simple-P)
         complex-P (not-empty (select-keys P complex-keys))
@@ -47,6 +63,8 @@
   (let [[exact-P tail-P] (split-with (partial not= '&) P)
         exact-MS (map matcher* exact-P)
         tail-M (when (seq tail-P)
+                 (when-not (= 2 (count tail-P))
+                   (throw (ex-info "Destructuring of a sequence tail must be a single pattern" {:pattern (rest tail-P)})))
                  (matcher* (second tail-P)))]
     (if (seq tail-P)
       (fn [matches data]
@@ -100,11 +118,15 @@
     (fn [matches _data]
       (list matches))
 
-    (symbol? P)
+    (binding? P)
     (fn [matches data]
       (if (contains? matches P)
         (or (and (= data (matches P)) (list matches)) ())
         (list (assoc matches P data))))
+
+    (memo-binding? P)
+    (fn [matches data]
+      (list (update matches P (fnil conj []) data)))
 
     :else
     (fn [matches data]
