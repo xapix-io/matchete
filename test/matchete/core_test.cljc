@@ -104,6 +104,22 @@
            :array [{:x 1}
                    {:x 42}]})))
 
+  (is (= #{'{!path [:array 1 :x], ?node 42}
+           '{!path [:foo :bar :zab], ?node 24}
+           '{!path [:array 1 :y 3], ?node 4}
+           '{!path [:array 1 :y 1], ?node 2}
+           '{!path [:foo :bar :baz], ?node 42}}
+         ((sut/matcher '$path-to-even)
+          {} {'$path-to-even (sut/matcher '(scan-indexed !path (or $path-to-even (and $even? ?node))))
+              '$even? (fn [matches _scope data]
+                        (when (and (number? data) (even? data))
+                          (list matches)))}
+          {:foo {:bar {:baz 42
+                       :zab 24}}
+           :array [{:x 1}
+                   {:x 42
+                    :y [1 2 3 4]}]})))
+
   (is (thrown-with-msg? ExceptionInfo
                         #"Undefined rule"
                         (sut/matches '(scan $rule)
