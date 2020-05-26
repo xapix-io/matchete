@@ -2,120 +2,109 @@
 
 Yet another pattern matching library for Clojure(Script).
 
-## Data as a pattern
+## Using
 
 ```clojure
-(require '[matchete.core :refer [match? matches]])
-
-;; constants
-(match? 42 42) ;; => true
-(match? 42 24) ;; => false
-
-;; collections
-(match? [1 2 3] [1 2 3]) ;; => true
-(match? {:x 1} {:x 1}) ;; => true
-
-;; nested collections
-(match? {:vec [1 2 3]
-         :map {:x 1
-               :y 2}}
-        {:vec [1 2 3]
-         :map {:x 1
-               :y 2}}) ;; => true
-
-;; sequential matchers
-;; elements in sequence are matches while element present in sequence
-(match? [1 2 3] [1 2]) ;; => false, because pattern require third element to match against 3
-
-;; hash maps
-(match? {:x 1} {:x 1 :y 2}) ;; => true
-(match? {:x 1 :y 2} {:x 1}) ;; => false
+(require '[matchete.core :as m])
 ```
 
-## Extract bindings
+## Match data using data as a pattern
 
 ```clojure
-;; symbol in pattern is a logical variable to extract values from matched data
-(matches '{:x x :y y} {:x 1 :y 2}) ;; => ({x 1 y 2})
+(m/match? 42 42) ;; => true
+(m/match? "42" "24") ;; => false
 
-(matches '{:x n :y n} {:x 1 :y 1}) ;; => ({n 1})
-(matches '{:x n :y n} {:x 1 :y 2}) ;; => ()
+;; sequences
+(m/match? [1 2 3] [1 2 3]) ;; => true
+(m/match? '(1 2 3) [1 2 3]) ;; => true
 
-;; '_' symbol is a placeholder to match anything without binding value
-(matches '{:x _ :y _ :z z} {:x 1 :y 2 :z 3}) ;; => ({z 3})
+(m/match? [1 2 3] [1 2 3 4]) ;; => false because pattern expects exactly 3 elements
 
-;; binding can be used as a key in map pattern
-(matches '{x 1} {:x 1}) ;; => ({x :x})
+;; to override this behaviour tail destructuring pattern can be used
+(m/match? [1 2 3 & _] [1 2 3 4]) ;; => true, `_` is a placeholder here that will match to any provided data
 
-;; 'matches' returns a list because binding as a key can match multiple times
-(matches '{x 1} {:x 1 :y 1}) ;; => ({x :x} {x :y})
-
-;; more sofisticated examples
-(matches
- '{x y
-   y x
-   z [x y]}
- {:x :y
-  :y :x
-  :z [:x :y]
-  :q [:y :x]})
-;; => ({x :x, y :y, z :z} {x :y, y :x, z :q})
+;; hash-maps
+(m/match? {:id 123 :name "Alise"} {:id 123 :name "Alise" :lastname "Cooper"}) ;; => true
+(m/match? {:id 123 :name "Alise"} {:id 123 :lastname "Cooper"}) ;; => false because `:name` key is missing
 ```
 
-## Control sequence
+## Extract data
+
+There are three types of special symbols that can be used in a pattern:
+
+* data bindings - symbols starts with '?'
+* memo bindings - symbols starts with '!'
+* named rule - symbols starts with '$'
+
+### Data Binding
 
 ```clojure
-;; by default sequential pattern will match if the matched sequence has the same length as the pattern
-(match? '[x 42 "qwe"] [:foo 42 "qwe" :tail-element]) ;; => false
+(m/matches '?user {:id 1 :name "Bob"}) ;; => '({?user {:id 1 :name "Bob"}})
+(m/matches '{:id ?user-id :name ?user-name}
+            {:id 1        :name "Bob"}) ;; => '({?user-id 1 ?user-name "Bob"})
 
-;; tail matcher can be added to the end of the pattern to override this behaviour
-(match? '[x 42 "qwe" & _] [:foo 42 "qwe" :tail-element]) ;; => true
+(m/matches '[1 ?two 3 & [?four & _]]
+            [1 2    3    4       5 6]) ;; => '({?two 2 ?four 4})
 
-;; to extract and match the tail of sequence it is possible to use '&
-;; This is working as in clojure destructuring pattern
-(matches '[x y & z] [1 2 3 4 5]) ;; => ({x 1 y 2 z (3 4 5)})
-
-;; `and` control sequence can wrap multiple patterns in a subsequence of matches
-(matches '(and {:id id :name name}   ;; match a map with :id and :role keys
-               {:role :admin}        ;; match a map with :role key
-               user)                 ;; match any data and fill ?user binding
-         {:id 1
-          :name "Dave"
-          :role :admin
-          :company "X"})
-;; => ({id 1
-;;      name "Dave"
-;;      user {:id 1
-;;            :name "Dave"
-;;            :role :admin
-;;            :company "X"}})
-
-;; `or` control sequence
-(matches '(alt {:x x} {:y x} {:z x})
-         ;; {:x 1} ;; => ({x 1})
-         ;; {:y 2} ;; => ({x 2})
-         {:z 3} ;; => ({x 3})
-         )
+(m/matches '{:vector [_       {:id ?id}]}
+            {:vector [{:id 1} {:id 2}]}) ;; => '({?id 2})
 ```
 
-## Functions with pattern-matching dispatch
+### Memo Binding
 
 ```clojure
-;; `defn-match` and `fn-match` macros can be used to create a function with pattern-based dispatch
-;; they are similar to their clojure siblings `defn` and `fn`
-;; there are two main difference:
-;;   * result is always a list with zero or many elements
-;;   * patterns checked from top to bottom and the first not empty results of applying `matches` function will be used to create local bindings to run the body associated with that pattern
+(m/matches '[{:id !ids} {:id !ids} {:id !ids}]
+            [{:id 1}    {:id 2}    {:id 3}]) ;; => '({!ids [1 2 3]})
+```
 
-(defn-match foo
-  ([0] 1)
-  ([1] 0)
-  ([{x 1}] (first (foo x)))
-  ([x] (str "this is X: " x)))
+## Control sequences
 
-(foo 0) ;; => (1)
-(foo 1) ;; => (0)
-(foo "`I'm X`") ;; => ("this is X: `I'm X`")
-(foo {"I'm X" 1
-      "I'm also X" 1}) ;; => ("this is X: I'm X" "this is X: I'm also X")
+### `and` combinator
+
+### `or` combinator
+
+### `scan`
+
+### `scan-indexed`
+
+Expects two patterns:
+
+  1. index matcher (index in sequences and key in hash-maps)
+  1. value matcher
+
+```clojure
+(m/matches '(scan-indexed !path (scan-indexed !path (scan-indexed !path ?node)))
+            [{:id 1
+              :user {:name "Alise"
+                     :role :admin}
+              :actions [{:type :login}]}])
+;; => '({!path [0 :user :name] ?node "Alise"}
+        {!path [0 :user :role] ?node :admin}
+        {!path [0 :actions 0]  ?node {:type :login}})
+```
+
+### Named rule
+
+```clojure
+(m/matches '(rule $children (scan-indexed !path (or $children ?leaf)))
+            [{:id 1
+              :user {:name "Alise"
+                     :role :admin}
+              :actions [{:type :login}]}])
+;; => '({!path [0 :id]              ?leaf 1}
+        {!path [0 :user :name]      ?leaf "Alise"}
+        {!path [0 :user :role]      ?leaf :admin}
+        {!path [0 :actions 0 :type] ?leaf :login})
+
+;; rules can be precompiled
+(let [rules {'$children (m/matcher '(scan-indexed !path (or $children ?leaf)))}]
+  (m/matches '$children rules
+             [{:id 1
+               :user {:name "Alise"
+                      :role :admin}
+               :actions [{:type :login}]}]))
+;; => '({!path [0 :id]              ?leaf 1}
+        {!path [0 :user :name]      ?leaf "Alise"}
+        {!path [0 :user :role]      ?leaf :admin}
+        {!path [0 :actions 0 :type] ?leaf :login})
 ```
