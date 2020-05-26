@@ -220,26 +220,3 @@
     (catch ExceptionInfo e
       (is (= {:pattern '(scan-indexed ?x ?y ?z)}
              (ex-data e))))))
-
-(sut/defn-match foo
-   ([?x]                (+ ?x 1))
-   ([?x {:foo 1 ?n ?n}] [?x ?n]))
-
-(deftest macro-test
-  (is (= [2]
-         (foo 1)))
-  (is (thrown-with-msg? ExceptionInfo
-                        #"Can not find declaration that satisfy the arguments"
-                        (foo 1 2)))
-  (is (try
-        (foo 1 2)
-        (catch ExceptionInfo e
-          (is (= {:arguments [1 2], :patterns '([?x] [?x {:foo 1, ?n ?n}])}
-                 (ex-data e))))))
-  (is (= [[1 :bar]]
-         (foo 1 {:foo 1 :bar :bar})))
-
-  (let [f (sut/fn-match foo
-            ([?x]                (+ ?x 1))
-            ([?x {:foo 1 ?n ?n}] [?x ?n]))]
-    (is (= [2] (f 1)))))

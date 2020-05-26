@@ -13,19 +13,6 @@
   (and (simple-symbol? P)
        (= \$ (first (name P)))))
 
-(defn find-bindings [P]
-  (cond
-    ((some-fn binding? memo-binding?) P)
-    (list P)
-
-    (sequential? P)
-    (mapcat find-bindings P)
-
-    (map? P)
-    (mapcat find-bindings (seq P))
-
-    :else ()))
-
 (declare matcher*)
 
 (defn simple-map-matcher [P]
