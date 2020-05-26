@@ -50,7 +50,23 @@ There are three types of special symbols that can be used in a pattern:
             {:vector [{:id 1} {:id 2}]}) ;; => '({?id 2})
 ```
 
+data bindings can be used as a hash-map keys
+
+```clojure
+(m/matches '{?key ?value}
+            {:foo "foo"
+             :bar "bar"}) ;; => '({?key :foo ?value "foo"} {?key :bar ?value "bar"})
+
+(m/matches '{?x "foo"
+             ?y "bar"}
+            {:key-1 "foo"
+             :key-2 "foo"
+             :key-3 "bar"}) ;; => '({?x :key-1 ?y :key-3} {?x :key-2 ?y :key-3})
+```
+
 ### Memo Binding
+
+Collect data into a vector. Order of appearence is not guaranteed.
 
 ```clojure
 (m/matches '[{:id !ids} {:id !ids} {:id !ids}]
@@ -61,9 +77,25 @@ There are three types of special symbols that can be used in a pattern:
 
 ### `and` combinator
 
+Each pattern will be applied to the same data combine data bindings into one result. Patterns can extend the result or add more sofisticated restrictions.
+
+```clojure
+(m/matches '(and {:id ?id :name ?name} ?user)
+            {:id 1
+             :name "Alise"
+             :lastname "Cooper"}) ;; => '({?id 1 ?name "Alise" ?user {:id 1 :name "Alise" :lastname "Cooper"}})
+```
+
 ### `or` combinator
 
 ### `scan`
+
+Expects one pattern wich will be applied to each item of sequence or hash-map (item will be in the form of tuple: [key, value]).
+
+```clojure
+(m/matches '{:foo (scan [?id ?name])}
+            {:foo [[1 "Alise"] [::empty] [3 "Bob"]]}) ;; => '({?id 1 ?name "Alise"} {?id 3 ?name "Bob"})'
+```
 
 ### `scan-indexed`
 

@@ -111,7 +111,8 @@
       (if (= 1 (count (rest P)))
         (let [M (matcher* (second P))]
           (fn [matches rules data]
-            (when (sequential? data)
+            (when (or (sequential? data)
+                      (map? data))
               (mapcat #(M matches rules %) data))))
         (throw (ex-info "`scan` expect exactly one pattern" {:pattern P})))
 
