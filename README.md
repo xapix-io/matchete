@@ -88,6 +88,16 @@ Each pattern will be applied to the same data combine data bindings into one res
 
 ### `or` combinator
 
+Patterns combined by `or` will be applied to the same data as long as one of them will match and the matches from that pattern will be the result of matching.
+
+```clojure
+(m/matches '(or {:id ?id} {"id" ?id} {:userId ?id})
+            {:id 1}        ;; => '({?id 1})
+            ;; {"id" 2}    ;; => '({?id 2})
+            ;; {:userId 3} ;; => '({?id 3})
+            )
+```
+
 ### `scan`
 
 Expects one pattern wich will be applied to each item of sequence or hash-map (item will be in the form of tuple: [key, value]).
