@@ -79,8 +79,8 @@ Expects two patterns:
                      :role :admin}
               :actions [{:type :login}]}])
 ;; => '({!path [0 :user :name] ?node "Alise"}
-        {!path [0 :user :role] ?node :admin}
-        {!path [0 :actions 0]  ?node {:type :login}})
+;;      {!path [0 :user :role] ?node :admin}
+;;      {!path [0 :actions 0]  ?node {:type :login}})
 ```
 
 ### Named rule
@@ -92,9 +92,9 @@ Expects two patterns:
                      :role :admin}
               :actions [{:type :login}]}])
 ;; => '({!path [0 :id]              ?leaf 1}
-        {!path [0 :user :name]      ?leaf "Alise"}
-        {!path [0 :user :role]      ?leaf :admin}
-        {!path [0 :actions 0 :type] ?leaf :login})
+;;      {!path [0 :user :name]      ?leaf "Alise"}
+;;      {!path [0 :user :role]      ?leaf :admin}
+;;      {!path [0 :actions 0 :type] ?leaf :login})
 
 ;; rules can be precompiled
 (let [rules {'$children (m/matcher '(scan-indexed !path (or $children ?leaf)))}]
@@ -104,7 +104,7 @@ Expects two patterns:
                       :role :admin}
                :actions [{:type :login}]}]))
 ;; => '({!path [0 :id]              ?leaf 1}
-        {!path [0 :user :name]      ?leaf "Alise"}
-        {!path [0 :user :role]      ?leaf :admin}
-        {!path [0 :actions 0 :type] ?leaf :login})
+;;      {!path [0 :user :name]      ?leaf "Alise"}
+;;      {!path [0 :user :role]      ?leaf :admin}
+;;      {!path [0 :actions 0 :type] ?leaf :login})
 ```
