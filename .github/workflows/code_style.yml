@@ -1,6 +1,9 @@
 name: Check code style using clj-kondo
 
-on: push
+on:
+  push:
+    tags-ignore:
+      - '*'
 
 jobs:
   lint:
