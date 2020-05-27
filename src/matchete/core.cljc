@@ -15,7 +15,7 @@
 
 (declare matcher*)
 
-(defn simple-map-matcher [P]
+(defn- simple-map-matcher [P]
   (let [M (reduce-kv #(assoc %1 %2 (matcher* %3)) {} P)]
     (fn [matches rules data]
       (reduce-kv
@@ -26,7 +26,7 @@
        (list matches)
        M))))
 
-(defn complex-map-matcher [P]
+(defn- complex-map-matcher [P]
   (let [M (matcher* (seq P))]
     (fn [matches rules data]
       (when (>= (count data)
@@ -35,7 +35,7 @@
                 (filter (fn [comb] (apply distinct? (map first comb)))
                         (combo/selections data (count P))))))))
 
-(defn map-matcher [P]
+(defn- map-matcher [P]
   (let [{simple-keys false complex-keys true} (group-by binding? (keys P))
         simple-P (select-keys P simple-keys)
         simple-M (simple-map-matcher simple-P)
@@ -50,7 +50,7 @@
             (mapcat #(complex-M % rules complex-data) matches')
             matches'))))))
 
-(defn seq-matcher [P]
+(defn- seq-matcher [P]
   (let [[exact-P tail-P] (split-with (partial not= '&) P)
         exact-MS (map matcher* exact-P)
         tail-M (when (seq tail-P)
@@ -76,7 +76,7 @@
            (list matches)
            (map vector exact-MS data)))))))
 
-(defn matcher* [P]
+(defn- matcher* [P]
   (cond
     (map? P)
     (map-matcher P)
