@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>io.xapix</groupId>
+    <artifactId>matchete</artifactId>
+    <name>matchete</name>
+    <version/>
+    <dependencies>
+        <dependency>
+            <groupId>org.clojure</groupId>
+            <artifactId>math.combinatorics</artifactId>
+            <version>0.1.6</version>
+        </dependency>
+    </dependencies>
+    <build>
+        <sourceDirectory>src</sourceDirectory>
+        <resources>
+            <resource>
+                <directory>src</directory>
+            </resource>
+        </resources>
+    </build>
+    <repositories>
+        <repository>
+            <id>clojars</id>
+            <url>https://repo.clojars.org/</url>
+        </repository>
+    </repositories>
+    <distributionManagement>
+        <repository>
+            <id>clojars</id>
+            <name>Clojars repository</name>
+            <url>https://repo.clojars.org/</url>
+        </repository>
+    </distributionManagement>
+    <description/>
+    <url>https://github.com/xapix-io/matchete</url>
+    <licenses>
+        <license>
+            <name>Eclipse Public License - v 1.0</name>
+            <url>http://www.eclipse.org/legal/epl-v10.html</url>
+        </license>
+    </licenses>
+    <scm>
+        <url>https://github.com/xapix-io/matchete</url>
+        <connection>scm:git:git://github.com/xapix-io/matchete.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/xapix-io/matchete.git</developerConnection>
+        <tag/>
+    </scm>
+</project>
