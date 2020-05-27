@@ -99,6 +99,13 @@
                {:foo {:bar {:baz 42
                             :zab 24}}
                 :array [{:x 1}
+                        {:x 42}]}))
+
+         (set (sut/matches '$path-to-42
+               '{$path-to-42 (scan-indexed !path (or $path-to-42 42))}
+               {:foo {:bar {:baz 42
+                            :zab 24}}
+                :array [{:x 1}
                         {:x 42}]}))))
 
   (is (= #{'{!path [:array 1 :x], ?node 42}

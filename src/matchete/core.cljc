@@ -179,9 +179,10 @@
   ([pattern data] (matches pattern {} {} data))
   ([pattern rules data] (matches pattern {} rules data))
   ([pattern init-matches rules data]
-   (if (fn? pattern)
-     (pattern init-matches rules data)
-     ((matcher pattern) init-matches rules data))))
+   (let [rules (reduce-kv #(assoc %1 %2 (if (fn? %3) %3 (matcher %3))) {} rules)]
+     (if (fn? pattern)
+       (pattern init-matches rules data)
+       ((matcher pattern) init-matches rules data)))))
 
 (defn match?
   ([pattern data] (match? pattern {} {} data))
