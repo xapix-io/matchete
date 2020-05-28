@@ -6,6 +6,19 @@ Yet another pattern matching library for Clojure(Script).
 
 ```clojure
 (require '[matchete.core :as m])
+
+;; `match?` function returns true or false to indicate if the data matches the pattern
+(m/match? '{:foo ?foo} {:foo 1}) ;; => true
+(m/match? '{:bar ?bar} {:foo 1}) ;; => false
+
+;; `matches` function returns lazy sequence with collected bindings
+;; empty seq indicates not matched data
+(m/matches '{:foo ?foo} {:foo 1}) ;; => '({?foo 1})
+(m/matches '{:bar ?bar} {:foo 1}) ;; => '()
+
+;; `matcher` function precompiles pattern into a function
+(let [matcher (m/matcher '{:foo ?foo})]
+  (matcher {:foo 1})) ;; => '({?foo 1})
 ```
 
 ## Match data using data as a pattern
