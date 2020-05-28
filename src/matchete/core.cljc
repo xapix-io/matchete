@@ -36,7 +36,7 @@
                         (combo/selections data (count P))))))))
 
 (defn- map-matcher [P]
-  (let [{simple-keys false complex-keys true} (group-by binding? (keys P))
+  (let [{simple-keys false complex-keys true} (group-by (some-fn binding? memo-binding?) (keys P))
         simple-P (select-keys P simple-keys)
         simple-M (simple-map-matcher simple-P)
         complex-P (not-empty (select-keys P complex-keys))

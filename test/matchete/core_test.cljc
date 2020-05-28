@@ -44,7 +44,12 @@
   (is (= ['{!foo [1 3]
             !bar [2 4]}]
          (sut/matches '[!foo !bar !foo !bar]
-                      [1 2 3 4]))))
+                      [1 2 3 4])))
+  (is (= '({!path [:x :x], ?node 1}
+           {!path [:x :y], ?node []}
+           {!path [:x :x], ?node 1})
+         (sut/matches '{:foo (scan {!path {!path ?node}})}
+                      {:foo [{:x {:x 1 :y []}} {:x {:x 1}}]}))))
 
 (deftest scan-pattern
   (is (empty? (sut/matches '(scan {:foo ?x})
