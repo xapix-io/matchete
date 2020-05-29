@@ -1,4 +1,5 @@
 (ns matchete.core
+  (:refer-clojure :exclude [cat])
   (:require [clojure.math.combinatorics :as combo]))
 
 (defn binding? [P]
@@ -17,6 +18,7 @@
 
 (defn- simple-map-matcher [P]
   (let [M (reduce-kv #(assoc %1 %2 (matcher* %3)) {} P)]
+    ^::matcher?
     (fn [matches rules data]
       (reduce-kv
        (fn [ms k M]
@@ -28,6 +30,7 @@
 
 (defn- complex-map-matcher [P]
   (let [M (matcher* (seq P))]
+    ^::matcher?
     (fn [matches rules data]
       (when (>= (count data)
                 (count P))
@@ -41,6 +44,7 @@
         simple-M (simple-map-matcher simple-P)
         complex-P (not-empty (select-keys P complex-keys))
         complex-M (when complex-P (complex-map-matcher complex-P))]
+    ^::matcher?
     (fn [matches rules data]
       (when (map? data)
         (let [simple-data (select-keys data simple-keys)
@@ -58,6 +62,7 @@
                    (throw (ex-info "Destructuring of a sequence tail must be a single pattern" {:pattern (rest tail-P)})))
                  (matcher* (second tail-P)))]
     (if (seq tail-P)
+      ^::matcher?
       (fn [matches rules data]
         (when (and (sequential? data)
                    (<= (count exact-MS) (count data)))
@@ -67,6 +72,7 @@
                      (list matches)
                      (map vector exact-MS data))]
             (mapcat #(tail-M % rules (drop (count exact-MS) data)) res))))
+      ^::matcher?
       (fn [matches rules data]
         (when (and (sequential? data)
                    (= (count exact-MS) (count data)))
@@ -76,80 +82,116 @@
            (list matches)
            (map vector exact-MS data)))))))
 
+(defn- set->map [s]
+  (into {} (map #(vec (repeat 2 %))) s))
+
+(defn- set-matcher [P]
+  (let [M (matcher* (set->map P))]
+    ^::matcher?
+    (fn [matches rules data]
+      (when (set? data)
+        (M matches rules (set->map data))))))
+
+(defn cat [& PS]
+  (let [MS (map matcher* PS)]
+    ^::matcher?
+    (fn [matches rules data]
+      (reduce
+       (fn [ms M]
+         (or (seq (mapcat #(M % rules data) ms)) (reduced ())))
+       (list matches)
+       MS))))
+
+(defn alt [& PS]
+  (let [MS (map matcher* PS)]
+    ^::matcher?
+    (fn [matches rules data]
+      (reduce
+       (fn [ms M]
+         (if-let [ms (seq (M matches rules data))]
+           (reduced ms)
+           ms))
+       ()
+       MS))))
+
+(defn scan [P]
+  (let [M (matcher* P)]
+    ^::matcher?
+    (fn [matches rules data]
+      (when (or (sequential? data)
+                (map? data))
+        (mapcat #(M matches rules %) data)))))
+
+(defn scan-indexed [index-P value-P]
+  (let [M (matcher* [index-P value-P])]
+    ^::matcher?
+    (fn [matches rules data]
+      (cond
+        (sequential? data)
+        (apply concat
+               (map-indexed
+                (fn [i v]
+                  (M matches rules [i v]))
+                data))
+
+        (map? data)
+        (mapcat #(M matches rules %) data)))))
+
+(defn def-rule [name P]
+  (let [M (matcher* P)]
+    ^::matcher?
+    (fn f [matches rules data]
+      (M matches (assoc rules name f) data))))
+
 (defn- matcher* [P]
   (cond
+    (and (fn? P)
+         (::matcher? (meta P)))
+    P
+
+    (set? P)
+    (set-matcher P)
+
     (map? P)
     (map-matcher P)
 
     (sequential? P)
     (case (first P)
-      and
-      (if (> (count (rest P)) 1)
-        (let [MS (map matcher* (rest P))]
-          (fn [matches rules data]
-            (reduce
-             (fn [ms M]
-               (or (seq (mapcat #(M % rules data) ms)) (reduced ())))
-             (list matches)
-             MS)))
-        (throw (ex-info "`and` expect more than one pattern" {:pattern P})))
+      cat
+      (apply cat (rest P))
 
-      or
-      (if (> (count (rest P)) 1)
-        (let [MS (map matcher* (rest P))]
-          (fn [matches rules data]
-            (reduce
-             (fn [ms M]
-               (if-let [ms (seq (M matches rules data))]
-                 (reduced ms)
-                 ms))
-             ()
-             MS)))
-        (throw (ex-info "`or` expect more than one pattern" {:pattern P})))
+      alt
+      (apply alt (rest P))
 
       scan
       (if (= 1 (count (rest P)))
-        (let [M (matcher* (second P))]
-          (fn [matches rules data]
-            (when (or (sequential? data)
-                      (map? data))
-              (mapcat #(M matches rules %) data))))
-        (throw (ex-info "`scan` expect exactly one pattern" {:pattern P})))
+        (scan (second P))
+        (throw (ex-info (str "Wrong number of args (" (count (rest P)) ") passed to: scan") {:pattern P})))
 
       scan-indexed
       (if (= 2 (count (rest P)))
-        (let [M (matcher* (rest P))]
-          (fn [matches rules data]
-            (cond
-              (sequential? data)
-              (apply concat
-                     (map-indexed
-                      (fn [i v]
-                        (M matches rules [i v]))
-                      data))
+        (apply scan-indexed (rest P))
+        (throw (ex-info (str "Wrong number of args (" (count (rest P)) ") passed to: scan-indexed") {:pattern P})))
 
-              (map? data)
-              (mapcat #(M matches rules %) data))))
-        (throw (ex-info "`scan-indexed` expect exactly two patterns" {:pattern P})))
-
-      rule
-      (let [M (matcher* (last P))]
-        (fn f [matches rules data]
-          (M matches (assoc rules (second P) f) data)))
+      def-rule
+      (apply def-rule (rest P))
 
       (seq-matcher P))
 
     (= '_ P)
+    ^::matcher?
     (fn [matches _rules _data]
       (list matches))
 
     (rule? P)
+    ^::matcher?
     (fn [matches rules data]
       (if-let [M (get rules P)]
         (M matches rules data)
         (throw (ex-info "Undefined rule" {:rule P}))))
 
     (binding? P)
+    ^::matcher?
     (fn [matches _rules data]
       (if (contains? matches P)
         (if (= data (get matches P))
@@ -158,10 +200,12 @@
         (list (assoc matches P data))))
 
     (memo-binding? P)
+    ^::matcher?
     (fn [matches _rules data]
       (list (update matches P (fnil conj []) data)))
 
     :else
+    ^::matcher?
     (fn [matches _rules data]
       (if (= data P)
         (list matches)
@@ -169,6 +213,7 @@
 
 (defn matcher [P]
   (let [M (matcher* P)]
+    ^::matcher?
     (fn f
       ([data] (f {} {} data))
       ([matches data] (f matches {} data))

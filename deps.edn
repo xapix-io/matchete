@@ -4,8 +4,7 @@
 
  :aliases
  {:+test {:extra-paths ["test"]
-          :extra-deps {lambdaisland/kaocha {:mvn/version "1.0-612"}
-                       lambdaisland/kaocha-cloverage {:mvn/version "1.0-45"}
+          :extra-deps {lambdaisland/kaocha {:mvn/version "1.0.632"}
                        lambdaisland/kaocha-cljs {:mvn/version "0.0-71"}}}
 
   :+cljs {:extra-deps {org.clojure/clojurescript {:mvn/version "1.10.597"}}}}}

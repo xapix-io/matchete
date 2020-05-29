@@ -39,8 +39,7 @@ jobs:
 
     - name: Run tests
       run: |
-        ./bin/kaocha clj --plugin cloverage
-        ./bin/kaocha cljs
+        ./bin/kaocha
 
     - uses: actions/upload-artifact@v2
       with:

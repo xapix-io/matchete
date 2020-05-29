@@ -1,7 +1,7 @@
 (ns matchete.core-test
   (:require [matchete.core :as sut]
-            #?(:clj [clojure.test :refer [deftest is]]
-               :cljs [cljs.test :refer [deftest is] :include-macros true]))
+            #?(:clj [clojure.test :refer [deftest is are]]
+               :cljs [cljs.test :refer [deftest is are] :include-macros true]))
   #?(:clj (:import (clojure.lang ExceptionInfo))))
 
 (deftest core-test
@@ -23,10 +23,11 @@
              :collections [1 2 3 ?x]}
             [1 2 3 & _]
             [1 2 3 4]
-            (and ?obj {:x ?x
+            (cat ?obj {:x ?x
                        :y ?y})
-            (or 1 ?x)
+            (alt 1 ?x)
             {?k ?v}
+            #{1 2 3}
             _]
           [1 "qwe" :x
            {:x :x
@@ -38,6 +39,7 @@
            :x
            {1 1
             4 4}
+           #{1 2 3}
            :not-bind]))))
 
 (deftest memo-binding
@@ -93,21 +95,21 @@
                                         :zab 24}}
                             :array [{:x 1}
                                     {:x 42}]}))
-         (set (sut/matches '(rule $path-to-42
-                                  (scan-indexed !path (or $path-to-42 42)))
+         (set (sut/matches '(def-rule $path-to-42
+                              (scan-indexed !path (alt $path-to-42 42)))
                            {:foo {:bar {:baz 42
                                         :zab 24}}
                             :array [{:x 1}
                                     {:x 42}]}))
          (set ((sut/matcher '$path-to-42)
-               {} {'$path-to-42 (sut/matcher '(scan-indexed !path (or $path-to-42 42)))}
+               {} {'$path-to-42 (sut/matcher '(scan-indexed !path (alt $path-to-42 42)))}
                {:foo {:bar {:baz 42
                             :zab 24}}
                 :array [{:x 1}
                         {:x 42}]}))
 
          (set (sut/matches '$path-to-42
-               '{$path-to-42 (scan-indexed !path (or $path-to-42 42))}
+               '{$path-to-42 (scan-indexed !path (alt $path-to-42 42))}
                {:foo {:bar {:baz 42
                             :zab 24}}
                 :array [{:x 1}
@@ -119,10 +121,10 @@
            '{!path [:array 1 :y 1], ?node 2}
            '{!path [:foo :bar :baz], ?node 42}}
          (set ((sut/matcher '$path-to-even)
-               {} {'$path-to-even (sut/matcher '(scan-indexed !path (or $path-to-even (and $even? ?node))))
-                   '$even? (fn [matches _scope data]
-                             (when (and (number? data) (even? data))
-                               (list matches)))}
+               {} {'$path-to-even (sut/matcher '(scan-indexed !path (alt $path-to-even (cat $even? ?node))))
+                   '$even? ^::sut/matcher? (fn [matches _rules data]
+                                             (when (and (number? data) (even? data))
+                                               (list matches)))}
                {:foo {:bar {:baz 42
                             :zab 24}}
                 :array [{:x 1}
@@ -180,6 +182,24 @@
             '{?x :z, ?y 3, ?z :y, ?v 2}]
            (sut/matches M {:x 1 :y 2 :z 3})))))
 
+(deftest functional-form
+  (let [find-leafs (sut/matcher
+                    (sut/def-rule '$find-leafs
+                      (sut/alt (sut/scan-indexed '!path '$find-leafs) '?node)))]
+    (prn (meta find-leafs))
+    (prn (meta (sut/def-rule '$find-leafs
+                 (sut/alt (sut/scan-indexed '!path '$find-leafs) '?node))))
+    (are [x y] (= x (find-leafs y))
+      '({?node 1}) 1
+
+      '({?node nil}) nil
+
+      '({!path [:x], ?node 1}
+        {!path [:y 0], ?node 2}
+        {!path [:y 1], ?node 3}
+        {!path [:y 2], ?node 4})
+      {:x 1 :y [2 3 4]})))
+
 (deftest incorrect-tail-pattern
   (is (thrown-with-msg? ExceptionInfo
                         #"Destructuring of a sequence tail must be a single pattern"
@@ -190,29 +210,9 @@
       (is (= {:pattern '(?y ?z)}
              (ex-data e))))))
 
-(deftest incorrect-or-pattern
-  (is (thrown-with-msg? ExceptionInfo
-                        #"`or` expect more than one pattern"
-                        (sut/matcher '(or ?x))))
-  (try
-    (sut/matcher '(or ?x))
-    (catch ExceptionInfo e
-      (is (= {:pattern '(or ?x)}
-             (ex-data e))))))
-
-(deftest incorrect-and-pattern
-  (is (thrown-with-msg? ExceptionInfo
-                        #"`and` expect more than one pattern"
-                        (sut/matcher '(and ?x))))
-  (try
-    (sut/matcher '(and ?x))
-    (catch ExceptionInfo e
-      (is (= {:pattern '(and ?x)}
-             (ex-data e))))))
-
 (deftest incorrect-scan-pattern
   (is (thrown-with-msg? ExceptionInfo
-                        #"`scan` expect exactly one pattern"
+                        #"Wrong number of args \(2\) passed to: scan"
                         (sut/matcher '(scan ?x ?y))))
   (try
     (sut/matcher '(scan ?x ?y))
@@ -222,7 +222,7 @@
 
 (deftest incorrect-scan-indexed-pattern
   (is (thrown-with-msg? ExceptionInfo
-                        #"`scan-indexed` expect exactly two patterns"
+                        #"Wrong number of args \(3\) passed to: scan-indexed"
                         (sut/matcher '(scan-indexed ?x ?y ?z))))
   (try
     (sut/matcher '(scan-indexed ?x ?y ?z))
