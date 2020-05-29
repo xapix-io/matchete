@@ -6,4 +6,5 @@
                    :test-paths   ["test"]
                    :source-paths ["src"]
                    ;; :cljs/repl-env cljs.repl.browser/repl-env
-                   }]}
+                   }]
+ :cloverage/opts {:codecov? true}}

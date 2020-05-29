@@ -39,7 +39,7 @@ jobs:
 
     - name: Run tests
       run: |
-        ./bin/kaocha
+        ./bin/kaocha --plugin cloverage
 
     - uses: actions/upload-artifact@v2
       with:
