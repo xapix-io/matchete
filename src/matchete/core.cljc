@@ -14,6 +14,24 @@
   (and (simple-symbol? P)
        (= \$ (first (name P)))))
 
+(def control-symbol?
+  #{'cat 'alt 'scan 'scan-indexed 'def-rule})
+
+(defn pattern? [obj]
+  (boolean
+   (or
+    ((some-fn binding? memo-binding? rule?) obj)
+    (and (fn? obj) (::matcher? (meta obj)))
+    (and (sequential? obj) (control-symbol? (first obj)))
+    (and ((some-fn sequential? map?) obj)
+         (reduce
+          (fn [p? el]
+            (if (pattern? el)
+              (reduced true)
+              p?))
+          false
+          obj)))))
+
 (declare matcher*)
 
 (defn- wrap-meta [f]
@@ -42,7 +60,7 @@
                          (combo/selections data (count P)))))))))
 
 (defn- map-matcher [P]
-  (let [{simple-keys false complex-keys true} (group-by (some-fn binding? memo-binding?) (keys P))
+  (let [{simple-keys false complex-keys true} (group-by pattern? (keys P))
         simple-P (select-keys P simple-keys)
         simple-M (simple-map-matcher simple-P)
         complex-P (not-empty (select-keys P complex-keys))
@@ -85,15 +103,21 @@
             (list matches)
             (map vector exact-MS data))))))))
 
-(defn- set->map [s]
-  (into {} (map #(vec (repeat 2 %))) s))
+(defn- set->map
+  ([s] (set->map nil s))
+  ([pref s]
+   (into {} (map #(vector (gensym (or pref "G__")) %)) s)))
 
 (defn- set-matcher [P]
-  (let [M (matcher* (set->map P))]
+  (let [m (set->map "?__" P)
+        M (matcher* m)
+        KS (keys m)]
     (wrap-meta
      (fn [matches rules data]
        (when (set? data)
-         (M matches rules (set->map data)))))))
+         (sequence
+          (map #(apply dissoc % KS))
+          (M matches rules (set->map data))))))))
 
 (defn cat [& PS]
   (let [MS (map matcher* PS)]
@@ -122,7 +146,8 @@
     (wrap-meta
      (fn [matches rules data]
        (when (or (sequential? data)
-                 (map? data))
+                 (map? data)
+                 (set? data))
          (mapcat #(M matches rules %) data))))))
 
 (defn scan-indexed [index-P value-P]
