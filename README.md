@@ -141,7 +141,7 @@ Expects two patterns:
 ### Named rule
 
 ```clojure
-(m/matches '(rule $children (scan-indexed !path (alt $children ?leaf)))
+(m/matches '(def-rule $children (scan-indexed !path (alt $children ?leaf)))
             [{:id 1
               :user {:name "Alise"
                      :role :admin}
