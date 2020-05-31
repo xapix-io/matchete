@@ -88,23 +88,23 @@ Collect data into a vector. Order of appearence is not guaranteed.
 
 ## Control sequences
 
-### `and` combinator
+### `cat` combinator
 
 Each pattern will be applied to the same data combine data bindings into one result. Patterns can extend the result or add more sofisticated restrictions.
 
 ```clojure
-(m/matches '(and {:id ?id :name ?name} ?user)
+(m/matches '(cat {:id ?id :name ?name} ?user)
             {:id 1
              :name "Alise"
              :lastname "Cooper"}) ;; => '({?id 1 ?name "Alise" ?user {:id 1 :name "Alise" :lastname "Cooper"}})
 ```
 
-### `or` combinator
+### `alt` combinator
 
-Patterns combined by `or` will be applied to the same data as long as one of them will match and the matches from that pattern will be the result of matching.
+Patterns combined by `alt` will be applied to the same data as long as one of them will match and the matches from that pattern will be the result of matching.
 
 ```clojure
-(m/matches '(or {:id ?id} {"id" ?id} {:userId ?id})
+(m/matches '(alt {:id ?id} {"id" ?id} {:userId ?id})
             {:id 1}        ;; => '({?id 1})
             ;; {"id" 2}    ;; => '({?id 2})
             ;; {:userId 3} ;; => '({?id 3})
@@ -141,7 +141,7 @@ Expects two patterns:
 ### Named rule
 
 ```clojure
-(m/matches '(rule $children (scan-indexed !path (or $children ?leaf)))
+(m/matches '(rule $children (scan-indexed !path (alt $children ?leaf)))
             [{:id 1
               :user {:name "Alise"
                      :role :admin}
@@ -152,7 +152,7 @@ Expects two patterns:
 ;;      {!path [0 :actions 0 :type] ?leaf :login})
 
 ;; rules can be precompiled
-(let [rules {'$children (m/matcher '(scan-indexed !path (or $children ?leaf)))}]
+(let [rules {'$children (m/matcher '(scan-indexed !path (alt $children ?leaf)))}]
   (m/matches '$children rules
              [{:id 1
                :user {:name "Alise"
