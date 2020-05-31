@@ -103,21 +103,25 @@
             (list matches)
             (map vector exact-MS data))))))))
 
-(defn- set->map
-  ([s] (set->map nil s))
-  ([pref s]
-   (into {} (map #(vector (gensym (or pref "G__")) %)) s)))
+(defn set->map-pattern [P]
+  (let [{simple false
+         complex true} (group-by pattern? P)]
+    (merge
+     (into {}
+           (map #(vector % %))
+           simple)
+     (into {} (map #(vector (gensym "?__") %)) complex))))
 
 (defn- set-matcher [P]
-  (let [m (set->map "?__" P)
+  (let [m (set->map-pattern P)
         M (matcher* m)
-        KS (keys m)]
+        KS (filter binding? (keys m))]
     (wrap-meta
      (fn [matches rules data]
        (when (set? data)
          (sequence
           (map #(apply dissoc % KS))
-          (M matches rules (set->map data))))))))
+          (M matches rules (into {} (map #(vector % %)) data))))))))
 
 (defn cat [& PS]
   (let [MS (map matcher* PS)]
