@@ -2,11 +2,11 @@
   (:require [matchete.core :as m]))
 
 (def city-to-city-distance
-  #{'["Berlin" #{("New York" 14) ("London" 2) ("Tokyo" 14) ("Vancouver" 13)}]
-    '["New York" #{("Berlin" 14) ("London" 12) ("Tokyo" 18) ("Vancouver" 6)}]
-    '["London" #{("Berlin" 2) ("New York" 12) ("Tokyo" 15) ("Vancouver" 10)}]
-    '["Tokyo" #{("Berlin" 14) ("New York" 18) ("London" 15) ("Vancouver" 12)}]
-    '["Vancouver" #{("Berlin" 13) ("New York" 6) ("London" 10) ("Tokyo" 12)}]})
+  #{["Berlin" #{["New York" 14] ["London" 2] ["Tokyo" 14] ["Vancouver" 13]}]
+    ["New York" #{["Berlin" 14] ["London" 12] ["Tokyo" 18] ["Vancouver" 6]}]
+    ["London" #{["Berlin" 2] ["New York" 12] ["Tokyo" 15] ["Vancouver" 10]}]
+    ["Tokyo" #{["Berlin" 14] ["New York" 18] ["London" 15] ["Vancouver" 12]}]
+    ["Vancouver" #{["Berlin" 13] ["New York" 6] ["London" 10] ["Tokyo" 12]}]})
 
 ;; generates pattern like this:
 ;; '#{[(cat ?0 !path) #{[?1 $sum]}]
