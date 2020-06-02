@@ -14,6 +14,7 @@
      [(cat ?2 !path) #{[?3 $sum]}]
      [(cat ?3 !path) #{[?4 $sum]}]
      [(cat ?4 !path) #{[?0 $sum]}]}
+
 (defn generate-pattern [cities-count]
   (let [l (range cities-count)]
     (into #{}
@@ -22,7 +23,11 @@
                   #{[(symbol (str "?" n2)) '$sum]}]))
           (take cities-count (map vector (cycle l) (rest (cycle l)))))))
 
-(defn shortest-path [db]
+(defn shortest-path
+  {:test #(do
+            (assert
+             (= 46 (first (shortest-path city-to-city-distance)))))}
+  [db]
   (let [{:syms [?distance !path]}
         (first
          (sort-by #(get % '?distance)
@@ -33,9 +38,3 @@
                                       (list (update matches '?distance (fnil + 0) data)))}
                              db)))]
     [?distance !path]))
-
-(comment
-
-  (shortest-path city-to-city-distance)
-
-  )

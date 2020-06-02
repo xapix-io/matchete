@@ -14,12 +14,16 @@
   (and (simple-symbol? P)
        (= \$ (first (name P)))))
 
+(defn placeholder? [P]
+  (= '_ P))
+
 (def control-symbol?
   #{'cat 'alt 'scan 'scan-indexed 'def-rule})
 
 (defn pattern? [obj]
   (boolean
    (or
+    (placeholder? obj)
     ((some-fn binding? memo-binding? rule?) obj)
     (and (fn? obj) (::matcher? (meta obj)))
     (and (sequential? obj) (control-symbol? (first obj)))
@@ -210,7 +214,7 @@
 
       (seq-matcher P))
 
-    (= '_ P)
+    (placeholder? P)
     (wrap-meta
      (fn [matches _rules _data]
        (list matches)))
