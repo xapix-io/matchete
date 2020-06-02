@@ -1,5 +1,6 @@
 (ns matchete.core-test
   (:require [matchete.core :as sut]
+            [example.poker-hand :as ph]
             #?(:clj [clojure.test :refer [deftest is are]]
                :cljs [cljs.test :refer [deftest is are] :include-macros true]))
   #?(:clj (:import (clojure.lang ExceptionInfo))))
@@ -53,6 +54,10 @@
          (sut/matches '{:foo (scan {!path {!path ?node}})}
                       {:foo [{:x {:x 1 :y []}} {:x {:x 1}}]}))))
 
+(deftest pattern?
+  (is (not (sut/pattern? {:foo 1 :bar 2})))
+  (is (sut/pattern? (with-meta (fn []) {::sut/matcher? true}))))
+
 (deftest scan-pattern
   (is (empty? (sut/matches '(scan {:foo ?x})
                            [{:bar 1} {:bar 2}])))
@@ -66,7 +71,18 @@
          (sut/matches '(scan {:foo ?x})
                       [{:foo 1}
                        {}
-                       {:foo 2}]))))
+                       {:foo 2}])))
+  (is (= #{'{?x 1} '{?x 2}}
+         (set (sut/matches '(scan {:foo ?x})
+                           #{{:foo 1}
+                             {}
+                             {:foo 2}}))))
+  (is (= #{'{?x 1 ?y 3 ?z 2}
+           '{?x 1 ?y 3 ?z 4}}
+         (set ((sut/matcher '#{?x ?y ?z})
+               '{?x 1
+                 ?y 3}
+               #{1 2 3 4})))))
 
 (deftest scan-indexed-pattern
   (is (empty? (sut/matches '(scan-indexed ?index ?data)
@@ -136,6 +152,11 @@
                         (sut/matches '(scan $rule)
                                      [1 2 3])))
 
+  (is (thrown-with-msg? ExceptionInfo
+                        #"Undefined rule"
+                        (sut/matches '(scan (%plus 1 ?n))
+                                     [1 2 3])))
+
   (try
     (sut/matches '(scan $rule)
                  [1 2 3])
@@ -186,9 +207,6 @@
   (let [find-leafs (sut/matcher
                     (sut/def-rule '$find-leafs
                       (sut/alt (sut/scan-indexed '!path '$find-leafs) '?node)))]
-    (prn (meta find-leafs))
-    (prn (meta (sut/def-rule '$find-leafs
-                 (sut/alt (sut/scan-indexed '!path '$find-leafs) '?node))))
     (are [x y] (= x (find-leafs y))
       '({?node 1}) 1
 
@@ -199,6 +217,26 @@
         {!path [:y 1], ?node 3}
         {!path [:y 2], ?node 4})
       {:x 1 :y [2 3 4]})))
+
+(deftest poker-hand
+  (are [hand res] (= (ph/poker-hand hand) res)
+    #{[:♠ 5] [:♠ 6] [:♠ 7] [:♠ 8] [:♠ 9]} "Straight flush"
+
+    #{[:♠ 5] [:♦ 5] [:♠ 7] [:♣ 5] [:♥ 5]} "Four of a kind"
+
+    #{[:♠ 5] [:♦ 5] [:♠ 7] [:♣ 5] [:♥ 7]} "Full house"
+
+    #{[:♠ 5] [:♠ 6] [:♠ 7] [:♠ 13] [:♠ 9]} "Flush"
+
+    #{[:♠ 5] [:♣ 6] [:♠ 7] [:♠ 8] [:♠ 9]} "Straight"
+
+    #{[:♠ 5] [:♦ 5] [:♠ 7] [:♣ 5] [:♥ 8]} "Three of a kind"
+
+    #{[:♠ 5] [:♦ 10] [:♠ 7] [:♣ 5] [:♥ 10]} "Two pair"
+
+    #{[:♠ 5] [:♦ 10] [:♠ 7] [:♣ 5] [:♥ 8]} "One pair"
+
+    #{[:♠ 5] [:♠ 6] [:♠ 7] [:♠ 8] [:♦ 11]} "Nothing"))
 
 (deftest incorrect-tail-pattern
   (is (thrown-with-msg? ExceptionInfo

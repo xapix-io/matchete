@@ -14,6 +14,10 @@
   (and (simple-symbol? P)
        (= \$ (first (name P)))))
 
+(defn dynamic-rule? [P]
+  (and (simple-symbol? P)
+       (= \% (first (name P)))))
+
 (defn placeholder? [P]
   (= '_ P))
 
@@ -26,7 +30,7 @@
     (placeholder? obj)
     ((some-fn binding? memo-binding? rule?) obj)
     (and (fn? obj) (::matcher? (meta obj)))
-    (and (sequential? obj) (control-symbol? (first obj)))
+    (and (sequential? obj) ((some-fn control-symbol? dynamic-rule?) (first obj)))
     (and ((some-fn sequential? map?) obj)
          (reduce
           (fn [p? el]
@@ -179,6 +183,13 @@
      (fn f [matches rules data]
        (M matches (assoc rules name f) data)))))
 
+(defn dynamic-rule [[name & args]]
+  (wrap-meta
+   (fn [matches rules data]
+     (if-let [rule (get rules name)]
+       ((apply rule args) matches rules data)
+       (throw (ex-info "Undefined rule" {:rule name}))))))
+
 (defn- matcher* [P]
   (cond
     (and (fn? P)
@@ -212,7 +223,9 @@
       def-rule
       (apply def-rule (rest P))
 
-      (seq-matcher P))
+      (if (dynamic-rule? (first P))
+        (dynamic-rule P)
+        (seq-matcher P)))
 
     (placeholder? P)
     (wrap-meta

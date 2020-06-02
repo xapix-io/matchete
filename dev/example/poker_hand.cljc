@@ -3,15 +3,6 @@
 
 ;; == helpers ==
 
-(defn match-n-plus-m [m]
-  (fn [{:syms [?n] :as matches} _ data]
-    (cond
-      (and ?n (= data (+ ?n m)))
-      (list matches)
-
-      (and (nil? ?n) (> data m))
-      (list (assoc matches '?n (- data m))))))
-
 (defn card-comparator [card-a card-b]
   (if (some m/pattern? [card-a card-b])
     1
@@ -20,11 +11,16 @@
 ;; === rules ===
 
 (def rules
-  {'$n   (match-n-plus-m 0)
-   '$n+1 (match-n-plus-m 1)
-   '$n+2 (match-n-plus-m 2)
-   '$n+3 (match-n-plus-m 3)
-   '$n+4 (match-n-plus-m 4)})
+  {'%plus (fn [s m]
+            (fn [matches _ data]
+              (cond
+                (and (contains? matches s)
+                     (= data (+ m (get matches s))))
+                (list matches)
+
+                (and (not (contains? matches s))
+                     (> data m))
+                (list (assoc matches s (- data m))))))})
 
 ;; =============
 
@@ -61,7 +57,7 @@
   (letfn [(match? [pattern hand]
             (m/match? pattern rules hand))]
     (condp match? hand
-      '#{[?s $n] [?s $n+1] [?s $n+2] [?s $n+3] [?s $n+4]}
+      '#{[?s ?n] [?s (%plus ?n 1)] [?s (%plus ?n 2)] [?s (%plus ?n 3)] [?s (%plus ?n 4)]}
       "Straight flush"
 
       (sorted-set-by card-comparator '[_ ?n] '[_ ?n] '[_ ?n] '[_ ?n] '_)
@@ -73,7 +69,7 @@
       (sorted-set-by card-comparator '[?s _] '[?s _] '[?s _] '[?s _] '[?s _])
       "Flush"
 
-      '#{[_ $n] [_ $n+1] [_ $n+2] [_ $n+3] [_ $n+4]}
+      '#{[_ ?n] [_ (%plus ?n 1)] [_ (%plus ?n 2)] [_ (%plus ?n 3)] [_ (%plus ?n 4)]}
       "Straight"
 
       (sorted-set-by card-comparator '[_ ?n] '[_ ?n] '[_ ?n] '_ '_)
