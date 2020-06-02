@@ -1,5 +1,5 @@
 (ns matchete.core
-  (:refer-clojure :exclude [cat])
+  (:refer-clojure :exclude [cat not])
   (:require [clojure.math.combinatorics :as combo]))
 
 (defn binding? [P]
@@ -22,7 +22,7 @@
   (= '_ P))
 
 (def control-symbol?
-  #{'cat 'alt 'scan 'scan-indexed 'def-rule})
+  #{'cat 'alt 'not 'scan 'scan-indexed 'def-rule})
 
 (defn pattern? [obj]
   (boolean
@@ -40,7 +40,7 @@
           false
           obj)))))
 
-(declare matcher*)
+(declare matcher* match?)
 
 (defn- wrap-meta [f]
   (with-meta f {::matcher? true}))
@@ -153,6 +153,13 @@
         ()
         MS)))))
 
+(defn not [P]
+  (let [M (matcher* P)]
+    (wrap-meta
+     (fn [matches rules data]
+       (when-not (match? M matches rules data)
+         (list matches))))))
+
 (defn scan [P]
   (let [M (matcher* P)]
     (wrap-meta
@@ -209,6 +216,9 @@
 
       alt
       (apply alt (rest P))
+
+      not
+      (apply not (rest P))
 
       scan
       (if (= 1 (count (rest P)))

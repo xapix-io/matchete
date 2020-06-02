@@ -1,6 +1,7 @@
 (ns matchete.core-test
   (:require [matchete.core :as sut]
             [example.poker-hand :as ph]
+            [clojure.string :as string]
             #?(:clj [clojure.test :refer [deftest is are]]
                :cljs [cljs.test :refer [deftest is are] :include-macros true]))
   #?(:clj (:import (clojure.lang ExceptionInfo))))
@@ -237,6 +238,20 @@
     #{[:♠ 5] [:♦ 10] [:♠ 7] [:♣ 5] [:♥ 8]} "One pair"
 
     #{[:♠ 5] [:♠ 6] [:♠ 7] [:♠ 8] [:♦ 11]} "Nothing"))
+
+(deftest not-pattern
+  (letfn [(matches [data]
+            (sut/matches '{:foo ?foo
+                           :bar (cat ?bar (not (%starts-with "__")))}
+                         {'%starts-with (fn [pref]
+                                          (fn [matches _ data]
+                                            (when (string/starts-with? data pref)
+                                              (list matches))))}
+                         data))]
+    (are [data res] (= res (matches data))
+      {:foo 1 :bar "qwe"}   ['{?bar "qwe" ?foo 1}]
+
+      {:foo 1 :bar "__qwe"} [])))
 
 (deftest incorrect-tail-pattern
   (is (thrown-with-msg? ExceptionInfo
