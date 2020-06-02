@@ -1,8 +1,38 @@
-# matchete
+# matchete [![cljdoc badge](https://cljdoc.org/badge/io.xapix/matchete)](https://cljdoc.org/d/io.xapix/matchete/CURRENT) ![Check code style using clj-kondo](https://github.com/xapix-io/matchete/workflows/Check%20code%20style%20using%20clj-kondo/badge.svg?branch=master) ![Run tests for all environments](https://github.com/xapix-io/matchete/workflows/Run%20tests%20for%20all%20environments/badge.svg?branch=master)
 
 Yet another pattern matching library for Clojure(Script).
 
 ## Using
+
+<details><summary>leiningen</summary>
+<p>
+
+```
+[io.xapix/matchete "1.0.0"]
+```
+
+</p>
+</details>
+
+<details><summary>boot</summary>
+<p>
+
+```
+(set-env! :dependencies #(conj % [io.xapix/matchete "1.0.0"]))
+```
+
+</p>
+</details>
+
+<details><summary>deps.edn</summary>
+<p>
+
+```
+{:deps {io.xapix/matchete {:mvn/version "1.0.0"}}}
+```
+
+</p>
+</details>
 
 ```clojure
 (require '[matchete.core :as m])
