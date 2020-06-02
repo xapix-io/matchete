@@ -9,11 +9,11 @@
      ["Vancouver" #{("Berlin" 13) ("New York" 6) ("London" 10) ("Tokyo" 12)}]})
 
 ;; generates pattern like this:
-#_'#{[(cat ?0 !path) #{[?1 $sum]}]
-     [(cat ?1 !path) #{[?2 $sum]}]
-     [(cat ?2 !path) #{[?3 $sum]}]
-     [(cat ?3 !path) #{[?4 $sum]}]
-     [(cat ?4 !path) #{[?0 $sum]}]}
+;; '#{[(cat ?0 !path) #{[?1 $sum]}]
+;;    [(cat ?1 !path) #{[?2 $sum]}]
+;;    [(cat ?2 !path) #{[?3 $sum]}]
+;;    [(cat ?3 !path) #{[?4 $sum]}]
+;;    [(cat ?4 !path) #{[?0 $sum]}]}
 
 (defn generate-pattern [cities-count]
   (let [l (range cities-count)]
