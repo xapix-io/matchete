@@ -221,6 +221,8 @@
 
 (deftest poker-hand
   (are [hand res] (= (ph/poker-hand hand) res)
+    #{[:♣ 10] [:♣ 14] [:♣ 12] [:♣ 13] [:♣ 11]} "Royal flush"
+
     #{[:♠ 5] [:♠ 6] [:♠ 7] [:♠ 8] [:♠ 9]} "Straight flush"
 
     #{[:♠ 5] [:♦ 5] [:♠ 7] [:♣ 5] [:♥ 5]} "Four of a kind"
@@ -237,7 +239,7 @@
 
     #{[:♠ 5] [:♦ 10] [:♠ 7] [:♣ 5] [:♥ 8]} "One pair"
 
-    #{[:♠ 5] [:♠ 6] [:♠ 7] [:♠ 8] [:♦ 11]} "Nothing"))
+    #{[:♠ 8] [:♠ 5] [:♠ 6] [:♦ 11] [:♠ 7]} [:♦ 11]))
 
 (deftest not-pattern
   (letfn [(matches [data]

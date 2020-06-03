@@ -20,7 +20,17 @@
 
                 (and (not (contains? matches s))
                      (> data m))
-                (list (assoc matches s (- data m))))))})
+                (list (assoc matches s (- data m))))))
+   '$high-card (fn [{[_ rank' :as card'] :card} _ [_ rank :as card]]
+                 (list {:card (cond
+                                (nil? card')
+                                card
+
+                                (> rank rank')
+                                card
+
+                                :else
+                                card')}))})
 
 ;; =============
 
@@ -51,12 +61,15 @@
              (= (poker-hand #{[:♠ 5] [:♦ 10] [:♠ 7] [:♣ 5] [:♥ 8]})
                 "One pair"))
             (assert
-             (= (poker-hand #{[:♠ 5] [:♠ 6] [:♠ 7] [:♠ 8] [:♦ 11]})
-                "Nothing")))}
+             (= (poker-hand #{[:♠ 5] [:♦ 11] [:♠ 6] [:♠ 7] [:♠ 8]})
+                [:♦ 11])))}
   [hand]
   (letfn [(match? [pattern hand]
             (m/match? pattern rules hand))]
     (condp match? hand
+      '#{[?s 14] [?s 13] [?s 12] [?s 11] [?s 10]}
+      "Royal flush"
+
       '#{[?s ?n] [?s (%plus ?n 1)] [?s (%plus ?n 2)] [?s (%plus ?n 3)] [?s (%plus ?n 4)]}
       "Straight flush"
 
@@ -81,4 +94,6 @@
       (sorted-set-by card-comparator '[_ ?n] '[_ ?n] '_ '_ '_)
       "One pair"
 
-      "Nothing")))
+      (-> (m/matches (sorted-set-by card-comparator '$high-card '$high-card '$high-card '$high-card '$high-card) rules hand)
+          first
+          :card))))
