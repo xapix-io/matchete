@@ -155,6 +155,8 @@ Patterns combined by `alt` will be applied to the same data as long as one of th
 
 ### `scan`
 
+#### `(scan P)`
+
 Expects one pattern wich will be applied to each item of sequence or hash-map (item will be in the form of tuple: [key, value]).
 
 ```clojure
@@ -162,7 +164,7 @@ Expects one pattern wich will be applied to each item of sequence or hash-map (i
             {:foo [[1 "Alise"] [::empty] [3 "Bob"]]}) ;; => '({?id 1 ?name "Alise"} {?id 3 ?name "Bob"})'
 ```
 
-### `scan-indexed`
+#### `(scan index-P value-P)`
 
 Expects two patterns:
 
@@ -170,7 +172,7 @@ Expects two patterns:
   1. value matcher
 
 ```clojure
-(m/matches '(scan-indexed !path (scan-indexed !path (scan-indexed !path ?node)))
+(m/matches '(scan !path (scan !path (scan !path ?node)))
             [{:id 1
               :user {:name "Alise"
                      :role :admin}
@@ -183,7 +185,7 @@ Expects two patterns:
 ### Named rule
 
 ```clojure
-(m/matches '(def-rule $children (scan-indexed !path (alt $children ?leaf)))
+(m/matches '(def-rule $children (scan !path (alt $children ?leaf)))
             [{:id 1
               :user {:name "Alise"
                      :role :admin}
@@ -194,7 +196,7 @@ Expects two patterns:
 ;;      {!path [0 :actions 0 :type] ?leaf :login})
 
 ;; rules can be precompiled
-(let [rules {'$children (m/matcher '(scan-indexed !path (alt $children ?leaf)))}]
+(let [rules {'$children (m/matcher '(scan !path (alt $children ?leaf)))}]
   (m/matches '$children rules
              [{:id 1
                :user {:name "Alise"

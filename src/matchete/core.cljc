@@ -55,44 +55,44 @@
        (when-not (match? M matches rules data)
          (list matches))))))
 
-(defn each [P]
-  (let [M (matcher* P)]
-    (wrap-meta
-     (fn [matches rules data]
-       (when (sequential? data)
-         (reduce
-          (fn [ms [M data]]
-            (mapcat #(M % rules data) ms))
-          (list matches)
-          (map vector (repeat (count data) M) data)))))))
+(defn each
+  ([P]
+   (let [M (matcher* P)]
+     (wrap-meta
+      (fn [matches rules data]
+        (when (sequential? data)
+          (reduce
+           (fn [ms [M data]]
+             (mapcat #(M % rules data) ms))
+           (list matches)
+           (map vector (repeat (count data) M) data)))))))
+  ([index-P value-P]
+   (let [M (each [index-P value-P])]
+     (wrap-meta
+      (fn [matches rules data]
+        (M matches rules (map-indexed vector data)))))))
 
-(defn each-indexed [index-P value-P]
-  (let [M (each [index-P value-P])]
-    (wrap-meta
-     (fn [matches rules data]
-       (M matches rules (map-indexed vector data))))))
+(defn scan
+  ([P]
+   (let [M (matcher* P)]
+     (wrap-meta
+      (fn [matches rules data]
+        (when ((some-fn sequential? map? set?) data)
+          (mapcat #(M matches rules %) data))))))
+  ([index-P value-P]
+   (let [M (matcher* [index-P value-P])]
+     (wrap-meta
+      (fn [matches rules data]
+        (cond
+          (sequential? data)
+          (apply concat
+                 (map-indexed
+                  (fn [i v]
+                    (M matches rules [i v]))
+                  data))
 
-(defn scan [P]
-  (let [M (matcher* P)]
-    (wrap-meta
-     (fn [matches rules data]
-       (when ((some-fn sequential? map? set?) data)
-         (mapcat #(M matches rules %) data))))))
-
-(defn scan-indexed [index-P value-P]
-  (let [M (matcher* [index-P value-P])]
-    (wrap-meta
-     (fn [matches rules data]
-       (cond
-         (sequential? data)
-         (apply concat
-                (map-indexed
-                 (fn [i v]
-                   (M matches rules [i v]))
-                 data))
-
-         ((some-fn map? set?) data)
-         (mapcat #(M matches rules %) data))))))
+          ((some-fn map? set?) data)
+          (mapcat #(M matches rules %) data)))))))
 
 (defn def-rule [name P]
   (let [M (matcher* P)]
@@ -112,9 +112,7 @@
    'alt alt
    'not not
    'each each
-   'each-indexed each-indexed
    'scan scan
-   'scan-indexed scan-indexed
    'def-rule def-rule})
 
 (def control-symbol?

@@ -1,6 +1,7 @@
 (ns matchete.core-test
   (:require [matchete.core :as sut]
             [example.poker-hand :as ph]
+            [example.graph :as g]
             [clojure.string :as string]
             #?(:clj [clojure.test :refer [deftest is are]]
                :cljs [cljs.test :refer [deftest is are] :include-macros true]))
@@ -86,18 +87,18 @@
                #{1 2 3 4})))))
 
 (deftest scan-indexed-pattern
-  (is (empty? (sut/matches '(scan-indexed ?index ?data)
+  (is (empty? (sut/matches '(scan ?index ?data)
                            [])))
-  (is (empty? (sut/matches '(scan-indexed ?index ?data)
+  (is (empty? (sut/matches '(scan ?index ?data)
                            {})))
-  (is (empty? (sut/matches '(scan-indexed ?index ?data)
+  (is (empty? (sut/matches '(scan ?index ?data)
                            42)))
   (is (= #{'{?index 1 ?data 2}
            '{?index 0 ?data 1}
            '{?index 2 ?data 3}}
-         (set (sut/matches '(scan-indexed ?index ?data)
+         (set (sut/matches '(scan ?index ?data)
                            [1 2 3]))
-         (set (sut/matches '(scan-indexed ?index ?data)
+         (set (sut/matches '(scan ?index ?data)
                            {0 1
                             1 2
                             2 3})))))
@@ -125,33 +126,33 @@
         sample (shuffle (range 100))]
     (is (= [{'?max-element 99 '?max-index (ffirst (filter (fn [[_ v]] (= v 99))
                                                           (map-indexed vector sample)))}]
-           (sut/matches '(each-indexed ?current-index $max) rules sample)))))
+           (sut/matches '(each ?current-index $max) rules sample)))))
 
 (deftest rule-tests
   (is (= #{'{!path [:array 1 :x]}
            '{!path [:foo :bar :baz]}}
-         (set (sut/matches '(scan-indexed !path
-                                          (scan-indexed !path
-                                                        (scan-indexed !path 42)))
+         (set (sut/matches '(scan !path
+                                          (scan !path
+                                                        (scan !path 42)))
                            {:foo {:bar {:baz 42
                                         :zab 24}}
                             :array [{:x 1}
                                     {:x 42}]}))
          (set (sut/matches '(def-rule $path-to-42
-                              (scan-indexed !path (alt $path-to-42 42)))
+                              (scan !path (alt $path-to-42 42)))
                            {:foo {:bar {:baz 42
                                         :zab 24}}
                             :array [{:x 1}
                                     {:x 42}]}))
          (set ((sut/matcher '$path-to-42)
-               {} {'$path-to-42 (sut/matcher '(scan-indexed !path (alt $path-to-42 42)))}
+               {} {'$path-to-42 (sut/matcher '(scan !path (alt $path-to-42 42)))}
                {:foo {:bar {:baz 42
                             :zab 24}}
                 :array [{:x 1}
                         {:x 42}]}))
 
          (set (sut/matches '$path-to-42
-               '{$path-to-42 (scan-indexed !path (alt $path-to-42 42))}
+               '{$path-to-42 (scan !path (alt $path-to-42 42))}
                {:foo {:bar {:baz 42
                             :zab 24}}
                 :array [{:x 1}
@@ -163,7 +164,7 @@
            '{!path [:array 1 :y 1], ?node 2}
            '{!path [:foo :bar :baz], ?node 42}}
          (set ((sut/matcher '$path-to-even)
-               {} {'$path-to-even (sut/matcher '(scan-indexed !path (alt $path-to-even (cat $even? ?node))))
+               {} {'$path-to-even (sut/matcher '(scan !path (alt $path-to-even (cat $even? ?node))))
                    '$even? ^::sut/matcher? (fn [matches _rules data]
                                              (when (and (number? data) (even? data))
                                                (list matches)))}
@@ -232,7 +233,7 @@
 (deftest functional-form
   (let [find-leafs (sut/matcher
                     (sut/def-rule '$find-leafs
-                      (sut/alt (sut/scan-indexed '!path '$find-leafs) '?node)))]
+                      (sut/alt (sut/scan '!path '$find-leafs) '?node)))]
     (are [x y] (= x (find-leafs y))
       '({?node 1}) 1
 
@@ -265,6 +266,9 @@
     #{[:♠ 5] [:♦ 10] [:♠ 7] [:♣ 5] [:♥ 8]} "One pair"
 
     #{[:♠ 8] [:♠ 5] [:♠ 6] [:♦ 11] [:♠ 7]} [:♦ 11]))
+
+(deftest graph
+  (is (= 46 (first (g/shortest-path g/city-to-city-distance)))))
 
 (deftest not-pattern
   (letfn [(matches [data]
