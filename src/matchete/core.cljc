@@ -21,8 +21,87 @@
 (defn placeholder? [P]
   (= '_ P))
 
+(declare matcher* match?)
+
+(defn- wrap-meta [f]
+  (with-meta f {::matcher? true}))
+
+(defn cat [& PS]
+  (let [MS (map matcher* PS)]
+    (wrap-meta
+     (fn [matches rules data]
+       (reduce
+        (fn [ms M]
+          (or (seq (mapcat #(M % rules data) ms)) (reduced ())))
+        (list matches)
+        MS)))))
+
+(defn alt [& PS]
+  (let [MS (map matcher* PS)]
+    (wrap-meta
+     (fn [matches rules data]
+       (reduce
+        (fn [ms M]
+          (if-let [ms (seq (M matches rules data))]
+            (reduced ms)
+            ms))
+        ()
+        MS)))))
+
+(defn not [P]
+  (let [M (matcher* P)]
+    (wrap-meta
+     (fn [matches rules data]
+       (when-not (match? M matches rules data)
+         (list matches))))))
+
+(defn scan [P]
+  (let [M (matcher* P)]
+    (wrap-meta
+     (fn [matches rules data]
+       (when (or (sequential? data)
+                 (map? data)
+                 (set? data))
+         (mapcat #(M matches rules %) data))))))
+
+(defn scan-indexed [index-P value-P]
+  (let [M (matcher* [index-P value-P])]
+    (wrap-meta
+     (fn [matches rules data]
+       (cond
+         (sequential? data)
+         (apply concat
+                (map-indexed
+                 (fn [i v]
+                   (M matches rules [i v]))
+                 data))
+
+         (map? data)
+         (mapcat #(M matches rules %) data))))))
+
+(defn def-rule [name P]
+  (let [M (matcher* P)]
+    (wrap-meta
+     (fn f [matches rules data]
+       (M matches (assoc rules name f) data)))))
+
+(defn dynamic-rule-matcher [[name & args]]
+  (wrap-meta
+   (fn [matches rules data]
+     (if-let [rule (get rules name)]
+       ((apply rule args) matches rules data)
+       (throw (ex-info "Undefined rule" {:rule name}))))))
+
+(def combinator
+  {'cat cat
+   'alt alt
+   'not not
+   'scan scan
+   'scan-indexed scan-indexed
+   'def-rule def-rule})
+
 (def control-symbol?
-  #{'cat 'alt 'not 'scan 'scan-indexed 'def-rule})
+  (set (keys combinator)))
 
 (defn pattern? [obj]
   (boolean
@@ -39,11 +118,6 @@
               p?))
           false
           obj)))))
-
-(declare matcher* match?)
-
-(defn- wrap-meta [f]
-  (with-meta f {::matcher? true}))
 
 (defn- simple-map-matcher [P]
   (let [M (reduce-kv #(assoc %1 %2 (matcher* %3)) {} P)]
@@ -131,72 +205,6 @@
           (map #(apply dissoc % KS))
           (M matches rules (into {} (map #(vector % %)) data))))))))
 
-(defn cat [& PS]
-  (let [MS (map matcher* PS)]
-    (wrap-meta
-     (fn [matches rules data]
-       (reduce
-        (fn [ms M]
-          (or (seq (mapcat #(M % rules data) ms)) (reduced ())))
-        (list matches)
-        MS)))))
-
-(defn alt [& PS]
-  (let [MS (map matcher* PS)]
-    (wrap-meta
-     (fn [matches rules data]
-       (reduce
-        (fn [ms M]
-          (if-let [ms (seq (M matches rules data))]
-            (reduced ms)
-            ms))
-        ()
-        MS)))))
-
-(defn not [P]
-  (let [M (matcher* P)]
-    (wrap-meta
-     (fn [matches rules data]
-       (when-not (match? M matches rules data)
-         (list matches))))))
-
-(defn scan [P]
-  (let [M (matcher* P)]
-    (wrap-meta
-     (fn [matches rules data]
-       (when (or (sequential? data)
-                 (map? data)
-                 (set? data))
-         (mapcat #(M matches rules %) data))))))
-
-(defn scan-indexed [index-P value-P]
-  (let [M (matcher* [index-P value-P])]
-    (wrap-meta
-     (fn [matches rules data]
-       (cond
-         (sequential? data)
-         (apply concat
-                (map-indexed
-                 (fn [i v]
-                   (M matches rules [i v]))
-                 data))
-
-         (map? data)
-         (mapcat #(M matches rules %) data))))))
-
-(defn def-rule [name P]
-  (let [M (matcher* P)]
-    (wrap-meta
-     (fn f [matches rules data]
-       (M matches (assoc rules name f) data)))))
-
-(defn dynamic-rule [[name & args]]
-  (wrap-meta
-   (fn [matches rules data]
-     (if-let [rule (get rules name)]
-       ((apply rule args) matches rules data)
-       (throw (ex-info "Undefined rule" {:rule name}))))))
-
 (defn- matcher* [P]
   (cond
     (and (fn? P)
@@ -210,32 +218,15 @@
     (map-matcher P)
 
     (sequential? P)
-    (case (first P)
-      cat
-      (apply cat (rest P))
+    (cond
+      (control-symbol? (first P))
+      (apply (combinator (first P)) (rest P))
 
-      alt
-      (apply alt (rest P))
+      (dynamic-rule? (first P))
+      (dynamic-rule-matcher P)
 
-      not
-      (apply not (rest P))
-
-      scan
-      (if (= 1 (count (rest P)))
-        (scan (second P))
-        (throw (ex-info (str "Wrong number of args (" (count (rest P)) ") passed to: scan") {:pattern P})))
-
-      scan-indexed
-      (if (= 2 (count (rest P)))
-        (apply scan-indexed (rest P))
-        (throw (ex-info (str "Wrong number of args (" (count (rest P)) ") passed to: scan-indexed") {:pattern P})))
-
-      def-rule
-      (apply def-rule (rest P))
-
-      (if (dynamic-rule? (first P))
-        (dynamic-rule P)
-        (seq-matcher P)))
+      :else
+      (seq-matcher P))
 
     (placeholder? P)
     (wrap-meta

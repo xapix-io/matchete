@@ -264,23 +264,3 @@
     (catch ExceptionInfo e
       (is (= {:pattern '(?y ?z)}
              (ex-data e))))))
-
-(deftest incorrect-scan-pattern
-  (is (thrown-with-msg? ExceptionInfo
-                        #"Wrong number of args \(2\) passed to: scan"
-                        (sut/matcher '(scan ?x ?y))))
-  (try
-    (sut/matcher '(scan ?x ?y))
-    (catch ExceptionInfo e
-      (is (= {:pattern '(scan ?x ?y)}
-             (ex-data e))))))
-
-(deftest incorrect-scan-indexed-pattern
-  (is (thrown-with-msg? ExceptionInfo
-                        #"Wrong number of args \(3\) passed to: scan-indexed"
-                        (sut/matcher '(scan-indexed ?x ?y ?z))))
-  (try
-    (sut/matcher '(scan-indexed ?x ?y ?z))
-    (catch ExceptionInfo e
-      (is (= {:pattern '(scan-indexed ?x ?y ?z)}
-             (ex-data e))))))
