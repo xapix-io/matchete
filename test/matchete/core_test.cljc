@@ -102,6 +102,31 @@
                             1 2
                             2 3})))))
 
+(deftest each-test
+  (let [rules {'$even? (fn [matches _ n]
+                         (when ((every-pred number? even?) n)
+                           (list matches)))
+               '$odd? (fn [matches _ n]
+                        (when ((every-pred number? odd?) n)
+                          (list matches)))}]
+    (is (= ['{!odd [1 3], !even [2]}]
+           (sut/matches '(each (alt (cat $even? !even)
+                                    (cat $odd? !odd)))
+                        rules
+                        [1 2 3])))))
+
+(deftest each-indexed-test
+  (let [rules {'$max (fn [{:syms [?max-element ?current-index] :as matches} _ n]
+                       (list (if (and ?max-element
+                                      (> ?max-element n))
+                               (select-keys matches ['?max-element '?max-index])
+                               {'?max-element n
+                                '?max-index ?current-index})))}
+        sample (shuffle (range 100))]
+    (is (= [{'?max-element 99 '?max-index (ffirst (filter (fn [[_ v]] (= v 99))
+                                                          (map-indexed vector sample)))}]
+           (sut/matches '(each-indexed ?current-index $max) rules sample)))))
+
 (deftest rule-tests
   (is (= #{'{!path [:array 1 :x]}
            '{!path [:foo :bar :baz]}}

@@ -55,13 +55,28 @@
        (when-not (match? M matches rules data)
          (list matches))))))
 
+(defn each [P]
+  (let [M (matcher* P)]
+    (wrap-meta
+     (fn [matches rules data]
+       (when (sequential? data)
+         (reduce
+          (fn [ms [M data]]
+            (mapcat #(M % rules data) ms))
+          (list matches)
+          (map vector (repeat (count data) M) data)))))))
+
+(defn each-indexed [index-P value-P]
+  (let [M (each [index-P value-P])]
+    (wrap-meta
+     (fn [matches rules data]
+       (M matches rules (map-indexed vector data))))))
+
 (defn scan [P]
   (let [M (matcher* P)]
     (wrap-meta
      (fn [matches rules data]
-       (when (or (sequential? data)
-                 (map? data)
-                 (set? data))
+       (when ((some-fn sequential? map? set?) data)
          (mapcat #(M matches rules %) data))))))
 
 (defn scan-indexed [index-P value-P]
@@ -76,7 +91,7 @@
                    (M matches rules [i v]))
                  data))
 
-         (map? data)
+         ((some-fn map? set?) data)
          (mapcat #(M matches rules %) data))))))
 
 (defn def-rule [name P]
@@ -96,6 +111,8 @@
   {'cat cat
    'alt alt
    'not not
+   'each each
+   'each-indexed each-indexed
    'scan scan
    'scan-indexed scan-indexed
    'def-rule def-rule})
@@ -157,6 +174,29 @@
              (mapcat #(complex-M % rules complex-data) matches')
              matches')))))))
 
+(defn- flex-seq-matcher [exact-MS tail-M]
+  (wrap-meta
+   (fn [matches rules data]
+     (when (and (sequential? data)
+                (<= (count exact-MS) (count data)))
+       (let [res (reduce
+                  (fn [ms [M data]]
+                    (mapcat #(M % rules data) ms))
+                  (list matches)
+                  (map vector exact-MS data))]
+         (mapcat #(tail-M % rules (drop (count exact-MS) data)) res))))))
+
+(defn- exact-seq-matcher [exact-MS]
+  (wrap-meta
+   (fn [matches rules data]
+     (when (and (sequential? data)
+                (= (count exact-MS) (count data)))
+       (reduce
+        (fn [ms [M data]]
+          (mapcat #(M % rules data) ms))
+        (list matches)
+        (map vector exact-MS data))))))
+
 (defn- seq-matcher [P]
   (let [[exact-P tail-P] (split-with (partial not= '&) P)
         exact-MS (map matcher* exact-P)
@@ -165,25 +205,8 @@
                    (throw (ex-info "Destructuring of a sequence tail must be a single pattern" {:pattern (rest tail-P)})))
                  (matcher* (second tail-P)))]
     (if (seq tail-P)
-      (wrap-meta
-       (fn [matches rules data]
-         (when (and (sequential? data)
-                    (<= (count exact-MS) (count data)))
-           (let [res (reduce
-                      (fn [ms [M data]]
-                        (mapcat #(M % rules data) ms))
-                      (list matches)
-                      (map vector exact-MS data))]
-             (mapcat #(tail-M % rules (drop (count exact-MS) data)) res)))))
-      (wrap-meta
-       (fn [matches rules data]
-         (when (and (sequential? data)
-                    (= (count exact-MS) (count data)))
-           (reduce
-            (fn [ms [M data]]
-              (mapcat #(M % rules data) ms))
-            (list matches)
-            (map vector exact-MS data))))))))
+      (flex-seq-matcher exact-MS tail-M)
+      (exact-seq-matcher exact-MS))))
 
 (defn set->map-pattern [P]
   (let [{simple false
