@@ -8,7 +8,7 @@ Yet another pattern matching library for Clojure(Script).
 <p>
 
 ```
-[io.xapix/matchete "1.0.0"]
+[io.xapix/matchete "1.1.0"]
 ```
 
 </p>
@@ -18,7 +18,7 @@ Yet another pattern matching library for Clojure(Script).
 <p>
 
 ```
-(set-env! :dependencies #(conj % [io.xapix/matchete "1.0.0"]))
+(set-env! :dependencies #(conj % [io.xapix/matchete "1.1.0"]))
 ```
 
 </p>
@@ -28,7 +28,7 @@ Yet another pattern matching library for Clojure(Script).
 <p>
 
 ```
-{:deps {io.xapix/matchete {:mvn/version "1.0.0"}}}
+{:deps {io.xapix/matchete {:mvn/version "1.1.0"}}}
 ```
 
 </p>
@@ -117,6 +117,18 @@ Collect data into a vector. Order of appearence is not guaranteed.
 ```
 
 ## Control sequences
+
+### `not` predicate
+
+```
+(m/matches '{:id (cat (not 10) ?id)
+             :name ?name}
+           {:id 42
+            :name "Alise"} ;; => '({?id 42 ?name "Alise"})
+           ;; {:id 10
+           ;;  :name "Bob"} ;; => '()
+           )
+```
 
 ### `cat` combinator
 
