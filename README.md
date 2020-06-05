@@ -225,3 +225,15 @@ Expects two patterns:
 ;;      {!path [0 :user :role]      ?leaf :admin}
 ;;      {!path [0 :actions 0 :type] ?leaf :login})
 ```
+
+Rules can work as predicates:
+
+```clojure
+(def rules
+  {'$string? (fn [matches _ s]
+               (when (string? s)
+                 (list matches)))})
+
+(m/match? '(each $string?) rules ["qwe" "rty" "uio"]) ;; => true
+(m/match? '(each $string?) rules ["qwe" 42 "uio"])    ;; => false
+```
