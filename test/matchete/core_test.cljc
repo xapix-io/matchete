@@ -273,7 +273,7 @@
 (deftest not-pattern
   (letfn [(matches [data]
             (sut/matches '{:foo ?foo
-                           :bar (cat ?bar (not (%starts-with "__")))}
+                           :bar (cat ?bar (not! (%starts-with "__")))}
                          {'%starts-with (fn [pref]
                                           (fn [matches _ data]
                                             (when (string/starts-with? data pref)
@@ -283,6 +283,14 @@
       {:foo 1 :bar "qwe"}   ['{?bar "qwe" ?foo 1}]
 
       {:foo 1 :bar "__qwe"} [])))
+
+(deftest placeholders-removed
+  (is (= ['{?bar 2}]
+         (sut/matches '[_foo _foo ?bar]
+                      [1 1 2])))
+  (is (= []
+         (sut/matches '[_foo _foo ?bar]
+                      [1 2 3]))))
 
 (deftest incorrect-tail-pattern
   (is (thrown-with-msg? ExceptionInfo

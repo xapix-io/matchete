@@ -118,10 +118,10 @@ Collect data into a vector. Order of appearence is not guaranteed.
 
 ## Control sequences
 
-### `not` predicate
+### `not!` predicate
 
 ```
-(m/matches '{:id (cat (not 10) ?id)
+(m/matches '{:id (cat (not! 10) ?id)
              :name ?name}
            {:id 42
             :name "Alise"} ;; => '({?id 42 ?name "Alise"})
@@ -152,6 +152,24 @@ Patterns combined by `alt` will be applied to the same data as long as one of th
             ;; {:userId 3} ;; => '({?id 3})
             )
 ```
+
+### `each`
+
+#### `(each P)`
+
+Sequentialy match elements of collection in order. Fail if any of elements can not match.
+
+```clojure
+(m/matches '(every (and %string? !elements))
+           ["qwe" "rty" "uio"]) ;; => '({!elements ["qwe" "rty" "uio"]})
+
+(m/matches '(every (and %string? !elements))
+           ["qwe" 42 "uio"]) ;; => '()
+```
+
+#### `(each index-P value-P)`
+
+2-arity version of `each` where first pattern will match against an index and second - match against value associated with that index.
 
 ### `scan`
 

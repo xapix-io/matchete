@@ -1,25 +1,21 @@
 (ns matchete.core
-  (:refer-clojure :exclude [cat not])
+  (:refer-clojure :exclude [cat])
   (:require [clojure.math.combinatorics :as combo]))
 
 (defn binding? [P]
-  (and (simple-symbol? P)
-       (= \? (first (name P)))))
+  (and (symbol? P) (= \? (first (str P)))))
 
 (defn memo-binding? [P]
-  (and (simple-symbol? P)
-       (= \! (first (name P)))))
+  (and (symbol? P) (= \! (first (str P)))))
 
 (defn rule? [P]
-  (and (simple-symbol? P)
-       (= \$ (first (name P)))))
+  (and (symbol? P) (= \$ (first (str P)))))
 
 (defn dynamic-rule? [P]
-  (and (simple-symbol? P)
-       (= \% (first (name P)))))
+  (and (symbol? P) (= \% (first (str P)))))
 
 (defn placeholder? [P]
-  (= '_ P))
+  (and (symbol? P) (= \_ (first (str P)))))
 
 (declare matcher* match?)
 
@@ -48,7 +44,7 @@
         ()
         MS)))))
 
-(defn not [P]
+(defn not! [P]
   (let [M (matcher* P)]
     (wrap-meta
      (fn [matches rules data]
@@ -110,7 +106,7 @@
 (def combinator
   {'cat cat
    'alt alt
-   'not not
+   'not! not!
    'each each
    'scan scan
    'def-rule def-rule})
@@ -226,6 +222,20 @@
           (map #(apply dissoc % KS))
           (M matches rules (into {} (map #(vector % %)) data))))))))
 
+(defn- binding-matcher [P]
+  (wrap-meta
+   (fn [matches _rules data]
+     (if (contains? matches P)
+       (if (= data (get matches P))
+         (list matches)
+         ())
+       (list (assoc matches P data))))))
+
+(defn clean-matches [matches]
+  (into {}
+        (filter #(not (placeholder? (first %))))
+        matches))
+
 (defn- matcher* [P]
   (cond
     (and (fn? P)
@@ -250,9 +260,11 @@
       (seq-matcher P))
 
     (placeholder? P)
-    (wrap-meta
-     (fn [matches _rules _data]
-       (list matches)))
+    (if (> (count (str P)) 1)
+      (binding-matcher P)
+      (wrap-meta
+       (fn [matches _rules _data]
+         (list matches))))
 
     (rule? P)
     (wrap-meta
@@ -262,13 +274,7 @@
          (throw (ex-info "Undefined rule" {:rule P})))))
 
     (binding? P)
-    (wrap-meta
-     (fn [matches _rules data]
-       (if (contains? matches P)
-         (if (= data (get matches P))
-           (list matches)
-           ())
-         (list (assoc matches P data)))))
+    (binding-matcher P)
 
     (memo-binding? P)
     (wrap-meta
@@ -289,16 +295,20 @@
        ([data] (f {} {} data))
        ([matches data] (f matches {} data))
        ([matches rules data]
-        (M matches rules data))))))
+        (sequence
+         (map clean-matches)
+         (M matches rules data)))))))
 
 (defn matches
   ([pattern data] (matches pattern {} {} data))
   ([pattern rules data] (matches pattern {} rules data))
   ([pattern init-matches rules data]
    (let [rules (reduce-kv #(assoc %1 %2 (if (fn? %3) %3 (matcher %3))) {} rules)]
-     (if (fn? pattern)
-       (pattern init-matches rules data)
-       ((matcher pattern) init-matches rules data)))))
+     (sequence
+      (map clean-matches)
+      (if (fn? pattern)
+        (pattern init-matches rules data)
+        ((matcher pattern) init-matches rules data))))))
 
 (defn match?
   ([pattern data] (match? pattern {} {} data))
