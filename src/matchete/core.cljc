@@ -2,25 +2,38 @@
   (:refer-clojure :exclude [cat])
   (:require [clojure.math.combinatorics :as combo]))
 
+(defn- symbol-type [s]
+  (when (symbol? s)
+    (case (first (name s))
+      \? ::binding
+      \! ::memo-binding
+      \$ ::rule
+      \% ::dynamic-rule
+      \_ ::placeholder
+      nil)))
+
 (defn binding? [P]
-  (and (symbol? P) (= \? (first (str P)))))
+  (= ::binding (symbol-type P)))
 
 (defn memo-binding? [P]
-  (and (symbol? P) (= \! (first (str P)))))
+  (= ::memo-binding (symbol-type P)))
 
 (defn rule? [P]
-  (and (symbol? P) (= \$ (first (str P)))))
+  (= ::rule (symbol-type P)))
 
 (defn dynamic-rule? [P]
-  (and (symbol? P) (= \% (first (str P)))))
+  (= ::dynamic-rule (symbol-type P)))
 
 (defn placeholder? [P]
-  (and (symbol? P) (= \_ (first (str P)))))
+  (= ::placeholder (symbol-type P)))
 
-(declare matcher* match?)
+(defn matcher? [F]
+  (::matcher? (meta F)))
 
 (defn- wrap-meta [f]
   (with-meta f {::matcher? true}))
+
+(declare matcher* match?)
 
 (defn cat [& PS]
   (let [MS (map matcher* PS)]
@@ -114,21 +127,17 @@
 (def control-symbol?
   (set (keys combinator)))
 
-(defn pattern? [obj]
+(defn control-sequence? [s]
   (boolean
-   (or
-    (placeholder? obj)
-    ((some-fn binding? memo-binding? rule?) obj)
-    (and (fn? obj) (::matcher? (meta obj)))
-    (and (sequential? obj) ((some-fn control-symbol? dynamic-rule?) (first obj)))
-    (and ((some-fn sequential? map?) obj)
-         (reduce
-          (fn [p? el]
-            (if (pattern? el)
-              (reduced true)
-              p?))
-          false
-          obj)))))
+   (and (sequential? s)
+        (control-symbol? (first s)))))
+
+(defn pattern? [o]
+  (boolean
+   (or (symbol-type o)
+       (matcher? o)
+       (control-sequence? o)
+       (and ((some-fn map? sequential?) o) (some pattern? o)))))
 
 (defn- simple-map-matcher [P]
   (let [M (reduce-kv #(assoc %1 %2 (matcher* %3)) {} P)]
@@ -209,18 +218,15 @@
      (into {}
            (map #(vector % %))
            simple)
-     (into {} (map #(vector (gensym "?__") %)) complex))))
+     (into {} (map #(vector (gensym "__") %)) complex))))
 
 (defn- set-matcher [P]
   (let [m (set->map-pattern P)
-        M (matcher* m)
-        KS (filter binding? (keys m))]
+        M (matcher* m)]
     (wrap-meta
      (fn [matches rules data]
        (when (set? data)
-         (sequence
-          (map #(apply dissoc % KS))
-          (M matches rules (into {} (map #(vector % %)) data))))))))
+         (M matches rules (into {} (map #(vector % %)) data)))))))
 
 (defn- binding-matcher [P]
   (wrap-meta
@@ -259,27 +265,29 @@
       :else
       (seq-matcher P))
 
-    (placeholder? P)
-    (if (> (count (str P)) 1)
-      (binding-matcher P)
+    (symbol-type P)
+    (case (symbol-type P)
+      ::placeholder
+      (if (> (count (name P)) 1)
+        (binding-matcher P)
+        (wrap-meta
+         (fn [matches _rules _data]
+           (list matches))))
+
+      ::rule
       (wrap-meta
-       (fn [matches _rules _data]
-         (list matches))))
+       (fn [matches rules data]
+         (if-let [M (get rules P)]
+           (M matches rules data)
+           (throw (ex-info "Undefined rule" {:rule P})))))
 
-    (rule? P)
-    (wrap-meta
-     (fn [matches rules data]
-       (if-let [M (get rules P)]
-         (M matches rules data)
-         (throw (ex-info "Undefined rule" {:rule P})))))
+      ::binding
+      (binding-matcher P)
 
-    (binding? P)
-    (binding-matcher P)
-
-    (memo-binding? P)
-    (wrap-meta
-     (fn [matches _rules data]
-       (list (update matches P (fnil conj []) data))))
+      ::memo-binding
+      (wrap-meta
+       (fn [matches _rules data]
+         (list (update matches P (fnil conj []) data)))))
 
     :else
     (wrap-meta
