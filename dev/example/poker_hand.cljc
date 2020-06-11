@@ -1,38 +1,79 @@
 (ns example.poker-hand
-  (:require [matchete.core :as m]))
+  (:require [matchete.logic :as logic]))
 
-;; == helpers ==
+(defn card [P]
+  (logic/matcher P))
 
-(defn card-comparator [card-a card-b]
-  (if (some m/pattern? [card-a card-b])
-    1
-    (compare card-a card-b)))
+(defn hand-pattern [pattern]
+  (logic/matcher (into #{} (map card) pattern)))
 
-;; === rules ===
+(defn match? [matcher hand]
+  (logic/match? matcher hand))
 
-(def rules
-  {'%plus (fn [s m]
-            (fn [matches _ data]
-              (cond
-                (and (contains? matches s)
-                     (= data (+ m (get matches s))))
-                (list matches)
+(defn p+ [lvar n]
+  (reify logic/Pattern
+    (matches [_ preconditions m]
+      (cond
+        (and (contains? preconditions lvar)
+             (= m (+ n (get preconditions lvar))))
+        (list preconditions)
 
-                (and (not (contains? matches s))
-                     (> data m))
-                (list (assoc matches s (- data m))))))
-   '$high-card (fn [{[_ rank' :as card'] :card} _ [_ rank :as card]]
-                 (list {:card (cond
-                                (nil? card')
-                                card
+        (and (not (contains? preconditions lvar))
+             (> m n))
+        (list (assoc preconditions lvar (- m n)))))))
 
-                                (> rank rank')
-                                card
+(defn high-card-> [lvar]
+  (reify logic/Pattern
+    (matches [_ {[_ rank' :as card'] lvar} [_ rank :as card]]
+      (list {lvar (cond
+                    (nil? card')
+                    card
 
-                                :else
-                                card')}))})
+                    (> rank rank')
+                    card
 
-;; =============
+                    :else
+                    card')}))))
+
+(let [p (hand-pattern [[:?s 14] [:?s 13] [:?s 12] [:?s 11] [:?s 10]])]
+  (defn royal-flush? [hand]
+    (logic/match? p hand)))
+
+(let [p (hand-pattern [[:?s :?n] [:?s (p+ :?n 1)] [:?s (p+ :?n 2)] [:?s (p+ :?n 3)] [:?s (p+ :?n 4)]])]
+  (defn straight-flush? [hand]
+    (logic/match? p hand)))
+
+(let [p (hand-pattern [[:_ :?n] [:_ :?n] [:_ :?n] [:_ :?n] :_])]
+  (defn four-of-a-kind? [hand]
+    (logic/match? p hand)))
+
+(let [p (hand-pattern [[:_ :?m] [:_ :?m] [:_ :?m] [:_ :?n] [:_ :?n]])]
+  (defn full-house? [hand]
+    (logic/match? p hand)))
+
+(let [p (hand-pattern [[:?s :_] [:?s :_] [:?s :_] [:?s :_] [:?s :_]])]
+  (defn flush? [hand]
+    (logic/match? p hand)))
+
+(let [p (hand-pattern [[:_ :?n] [:_ (p+ :?n 1)] [:_ (p+ :?n 2)] [:_ (p+ :?n 3)] [:_ (p+ :?n 4)]])]
+  (defn straight? [hand]
+    (logic/match? p hand)))
+
+(let [p (hand-pattern [[:_ :?n] [:_ :?n] [:_ :?n] :_ :_])]
+  (defn three-of-a-kind? [hand]
+    (logic/match? p hand)))
+
+(let [p (hand-pattern [[:_ :?n] [:_ :?n] [:_ :?m] [:_ :?m] :_])]
+  (defn two-pair? [hand]
+    (logic/match? p hand)))
+
+(let [p (hand-pattern [[:_ :?n] [:_ :?n] :_ :_ :_])]
+  (defn one-pair? [hand]
+    (logic/match? p hand)))
+
+(let [p (hand-pattern (repeatedly 5 #(high-card-> :?card)))]
+  (defn high-card [hand]
+    (:?card (first (logic/matches p hand)))))
 
 (defn poker-hand
   {:test #(do
@@ -64,36 +105,42 @@
              (= (poker-hand #{[:♠ 5] [:♦ 11] [:♠ 6] [:♠ 7] [:♠ 8]})
                 [:♦ 11])))}
   [hand]
-  (letfn [(match? [pattern hand]
-            (m/match? pattern rules hand))]
-    (condp match? hand
-      '#{[?s 14] [?s 13] [?s 12] [?s 11] [?s 10]}
-      "Royal flush"
+  (cond
+    (royal-flush? hand)
+    "Royal flush"
 
-      '#{[?s ?n] [?s (%plus ?n 1)] [?s (%plus ?n 2)] [?s (%plus ?n 3)] [?s (%plus ?n 4)]}
-      "Straight flush"
+    (straight-flush? hand)
+    "Straight flush"
 
-      (sorted-set-by card-comparator '[_ ?n] '[_ ?n] '[_ ?n] '[_ ?n] '_)
-      "Four of a kind"
+    (four-of-a-kind? hand)
+    "Four of a kind"
 
-      (sorted-set-by card-comparator '[_ ?m] '[_ ?m] '[_ ?m] '[_ ?n] '[_ ?n])
-      "Full house"
+    (full-house? hand)
+    "Full house"
 
-      (sorted-set-by card-comparator '[?s _] '[?s _] '[?s _] '[?s _] '[?s _])
-      "Flush"
+    (flush? hand)
+    "Flush"
 
-      '#{[_ ?n] [_ (%plus ?n 1)] [_ (%plus ?n 2)] [_ (%plus ?n 3)] [_ (%plus ?n 4)]}
-      "Straight"
+    (straight? hand)
+    "Straight"
 
-      (sorted-set-by card-comparator '[_ ?n] '[_ ?n] '[_ ?n] '_ '_)
-      "Three of a kind"
+    (three-of-a-kind? hand)
+    "Three of a kind"
 
-      (sorted-set-by card-comparator '[_ ?n] '[_ ?n] '[_ ?m] '[_ ?m] '_)
-      "Two pair"
+    (two-pair? hand)
+    "Two pair"
 
-      (sorted-set-by card-comparator '[_ ?n] '[_ ?n] '_ '_ '_)
-      "One pair"
+    (one-pair? hand)
+    "One pair"
 
-      (-> (m/matches (sorted-set-by card-comparator '$high-card '$high-card '$high-card '$high-card '$high-card) rules hand)
-          first
-          :card))))
+    :else
+    (high-card hand)))
+
+(comment
+
+  (time
+   (dotimes [_ 100]
+     (poker-hand #{[:♠ 10] [:♠ 11] [:♠ 12] [:♠ 13] [:♠ 14]})
+     (poker-hand #{[:♠ 5] [:♦ 11] [:♠ 6] [:♠ 7] [:♠ 8]})))
+
+  )

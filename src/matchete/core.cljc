@@ -1,165 +1,165 @@
 (ns matchete.core
-  (:refer-clojure :exclude [cat])
-  (:require [clojure.math.combinatorics :as combo]))
+  (:refer-clojure :exclude [not conj disj])
+  (:require [clojure.math.combinatorics :as combo]
+            [clojure.string :as string]
+            [#?(:clj clojure.core :cljs cljs.core) :as cc]))
 
-(defn- symbol-type [s]
-  (when (symbol? s)
-    (case (first (name s))
-      \? ::binding
-      \! ::memo-binding
-      \$ ::rule
-      \% ::dynamic-rule
-      \_ ::placeholder
-      nil)))
-
-(defn binding? [P]
-  (= ::binding (symbol-type P)))
-
-(defn memo-binding? [P]
-  (= ::memo-binding (symbol-type P)))
-
-(defn rule? [P]
-  (= ::rule (symbol-type P)))
-
-(defn dynamic-rule? [P]
-  (= ::dynamic-rule (symbol-type P)))
-
-(defn placeholder? [P]
-  (= ::placeholder (symbol-type P)))
-
-(defn matcher? [F]
-  (::matcher? (meta F)))
-
-(defn- wrap-meta [f]
-  (with-meta f {::matcher? true}))
+;; TODO extend matcher's metadata with to-edn function
 
 (declare matcher* match?)
 
-(defn cat [& PS]
+(defn conj
+  "conj[unction] of multiple patterns."
+  [& PS]
   (let [MS (map matcher* PS)]
-    (wrap-meta
-     (fn [matches rules data]
-       (reduce
-        (fn [ms M]
-          (or (seq (mapcat #(M % rules data) ms)) (reduced ())))
-        (list matches)
-        MS)))))
+    (with-meta
+      (fn [matches data]
+        (reduce
+         (fn [ms M]
+           (or (seq (mapcat #(M % data) ms)) (reduced ())))
+         (list matches)
+         MS))
+      {::matcher? true})))
 
-(defn alt [& PS]
+(defn disj
+  "disj[unction] of multiple patterns."
+  [& PS]
   (let [MS (map matcher* PS)]
-    (wrap-meta
-     (fn [matches rules data]
-       (reduce
-        (fn [ms M]
-          (if-let [ms (seq (M matches rules data))]
-            (reduced ms)
-            ms))
-        ()
-        MS)))))
+    (with-meta
+      (fn [matches data]
+        (reduce
+         (fn [ms M]
+           (if-let [ms (seq (M matches data))]
+             (reduced ms)
+             ms))
+         ()
+         MS))
+      {::matcher? true})))
 
-(defn not! [P]
+(defn not [P]
   (let [M (matcher* P)]
-    (wrap-meta
-     (fn [matches rules data]
-       (when-not (match? M matches rules data)
-         (list matches))))))
+    (with-meta
+      (fn [matches data]
+        (when-not (match? M matches data)
+          (list matches)))
+      {::matcher? true})))
 
 (defn each
   ([P]
    (let [M (matcher* P)]
-     (wrap-meta
-      (fn [matches rules data]
-        (when (sequential? data)
-          (reduce
-           (fn [ms [M data]]
-             (mapcat #(M % rules data) ms))
-           (list matches)
-           (map vector (repeat (count data) M) data)))))))
+     (with-meta
+       (fn [matches data]
+         (when (sequential? data)
+           (reduce
+            (fn [ms [M data]]
+              (mapcat #(M % data) ms))
+            (list matches)
+            (map vector (repeat (count data) M) data))))
+       {::matcher? true})))
   ([index-P value-P]
    (let [M (each [index-P value-P])]
-     (wrap-meta
-      (fn [matches rules data]
-        (M matches rules (map-indexed vector data)))))))
+     (with-meta
+       (fn [matches data]
+         (M matches (map-indexed vector data)))
+       {::matcher? true}))))
 
 (defn scan
   ([P]
    (let [M (matcher* P)]
-     (wrap-meta
-      (fn [matches rules data]
-        (when ((some-fn sequential? map? set?) data)
-          (mapcat #(M matches rules %) data))))))
+     (with-meta
+       (fn [matches data]
+         (when (sequential? data)
+           (mapcat #(M matches %) data)))
+       {::matcher? true})))
   ([index-P value-P]
    (let [M (matcher* [index-P value-P])]
-     (wrap-meta
-      (fn [matches rules data]
-        (cond
-          (sequential? data)
-          (apply concat
-                 (map-indexed
-                  (fn [i v]
-                    (M matches rules [i v]))
-                  data))
+     (with-meta
+       (fn [matches data]
+         (when (sequential? data)
+           (apply concat
+                  (map-indexed
+                   (fn [i v]
+                     (M matches [i v]))
+                   data))))
+       {::matcher? true}))))
 
-          ((some-fn map? set?) data)
-          (mapcat #(M matches rules %) data)))))))
+(defn- logic-var? [P]
+  (and (keyword? P) (some #(string/starts-with? (name P) %) ["?" "!" "_"])))
 
-(defn def-rule [name P]
-  (let [M (matcher* P)]
-    (wrap-meta
-     (fn f [matches rules data]
-       (M matches (assoc rules name f) data)))))
+(defn pattern? [P]
+  (or (logic-var? P)
+      ((some-fn ::matcher? ::matcher-maker?) (meta P))
+      (and ((some-fn map? sequential? set?) P)
+           (some pattern? P))))
 
-(defn dynamic-rule-matcher [[name & args]]
-  (wrap-meta
-   (fn [matches rules data]
-     (if-let [rule (get rules name)]
-       ((apply rule args) matches rules data)
-       (throw (ex-info "Undefined rule" {:rule name}))))))
+(defn- binding-matcher [P]
+  (with-meta
+    (fn [matches data]
+      (if (contains? matches P)
+        (if (= data (get matches P))
+          (list matches)
+          ())
+        (list (assoc matches P data))))
+    {::matcher? true}))
 
-(def combinator
-  {'cat cat
-   'alt alt
-   'not! not!
-   'each each
-   'scan scan
-   'def-rule def-rule})
+(defn- memo-binding-matcher [P]
+  (with-meta
+    (fn [matches data]
+      (list (update matches P (fnil cc/conj []) data)))
+    {::matcher? true}))
 
-(def control-symbol?
-  (set (keys combinator)))
+(defn- placeholder-matcher [P]
+  (if (> (count (name P)) 1)
+    (binding-matcher P)
+    (with-meta
+      (fn [matches _data]
+        (list matches))
+      {::matcher? true})))
 
-(defn control-sequence? [s]
-  (boolean
-   (and (sequential? s)
-        (control-symbol? (first s)))))
+(defn- data-matcher [D]
+  (with-meta
+    (fn [matches data]
+      (if (= data D)
+        (list matches)
+        ()))
+    {::matcher? true}))
 
-(defn pattern? [o]
-  (boolean
-   (or (symbol-type o)
-       (matcher? o)
-       (control-sequence? o)
-       (and ((some-fn map? sequential?) o) (some pattern? o)))))
+(defn- seq-matcher [PS]
+  (let [MS (map matcher* PS)]
+    (with-meta
+      (fn [matches data]
+        (when (and (sequential? data)
+                   (<= (count MS) (count data)))
+          (reduce-kv
+           (fn [matches M d]
+             (mapcat #(M % d) matches))
+           (list matches)
+           (zipmap MS data))))
+      {::matcher? true})))
 
 (defn- simple-map-matcher [P]
   (let [M (reduce-kv #(assoc %1 %2 (matcher* %3)) {} P)]
-    (wrap-meta
-      (fn [matches rules data]
+    (with-meta
+      (fn [matches data]
         (reduce-kv
          (fn [ms k M]
            (or (and (contains? data k)
-                    (seq (mapcat #(M % rules (get data k)) ms)))
+                    (seq (mapcat #(M % (get data k)) ms)))
                (reduced ())))
          (list matches)
-         M)))))
+         M))
+      {::matcher? true})))
 
 (defn- complex-map-matcher [P]
   (let [M (matcher* (seq P))]
-    (wrap-meta
-     (fn [matches rules data]
-       (when (>= (count data)
-                 (count P))
-         (mapcat #(M matches rules %)
-                 (filter (fn [comb] (apply distinct? (map first comb)))
-                         (combo/selections data (count P)))))))))
+    (with-meta
+      (fn [matches data]
+        (when (>= (count data)
+                  (count P))
+          (mapcat #(M matches %)
+                  (filter (fn [comb] (apply distinct? (map first comb)))
+                          (combo/selections data (count P))))))
+      {::matcher? true})))
 
 (defn- map-matcher [P]
   (let [{simple-keys false complex-keys true} (group-by pattern? (keys P))
@@ -167,85 +167,36 @@
         simple-M (simple-map-matcher simple-P)
         complex-P (not-empty (select-keys P complex-keys))
         complex-M (when complex-P (complex-map-matcher complex-P))]
-    (wrap-meta
-     (fn [matches rules data]
-       (when (map? data)
-         (let [simple-data (select-keys data simple-keys)
-               complex-data (apply (partial dissoc data) simple-keys)
-               matches' (simple-M matches rules simple-data)]
-           (if (and complex-M (seq matches'))
-             (mapcat #(complex-M % rules complex-data) matches')
-             matches')))))))
+    (with-meta
+      (fn [matches data]
+        (when (map? data)
+          (let [simple-data (select-keys data simple-keys)
+                complex-data (apply (partial dissoc data) simple-keys)
+                matches' (simple-M matches simple-data)]
+            (if (and complex-M (seq matches'))
+              (mapcat #(complex-M % complex-data) matches')
+              matches'))))
+      {::matcher? true})))
 
-(defn- flex-seq-matcher [exact-MS tail-M]
-  (wrap-meta
-   (fn [matches rules data]
-     (when (and (sequential? data)
-                (<= (count exact-MS) (count data)))
-       (let [res (reduce
-                  (fn [ms [M data]]
-                    (mapcat #(M % rules data) ms))
-                  (list matches)
-                  (map vector exact-MS data))]
-         (mapcat #(tail-M % rules (drop (count exact-MS) data)) res))))))
-
-(defn- exact-seq-matcher [exact-MS]
-  (wrap-meta
-   (fn [matches rules data]
-     (when (and (sequential? data)
-                (= (count exact-MS) (count data)))
-       (reduce
-        (fn [ms [M data]]
-          (mapcat #(M % rules data) ms))
-        (list matches)
-        (map vector exact-MS data))))))
-
-(defn- seq-matcher [P]
-  (let [[exact-P tail-P] (split-with (partial not= '&) P)
-        exact-MS (map matcher* exact-P)
-        tail-M (when (seq tail-P)
-                 (when-not (= 2 (count tail-P))
-                   (throw (ex-info "Destructuring of a sequence tail must be a single pattern" {:pattern (rest tail-P)})))
-                 (matcher* (second tail-P)))]
-    (if (seq tail-P)
-      (flex-seq-matcher exact-MS tail-M)
-      (exact-seq-matcher exact-MS))))
-
-(defn set->map-pattern [P]
+(defn- set->map-pattern [P]
   (let [{simple false
          complex true} (group-by pattern? P)]
     (merge
-     (into {}
-           (map #(vector % %))
-           simple)
-     (into {} (map #(vector (gensym "__") %)) complex))))
+     (into {} (map (fn [v] [v v])) simple)
+     (into {} (map (fn [v] [(keyword (gensym "_")) v])) complex))))
 
 (defn- set-matcher [P]
   (let [m (set->map-pattern P)
-        M (matcher* m)]
-    (wrap-meta
-     (fn [matches rules data]
-       (when (set? data)
-         (M matches rules (into {} (map #(vector % %)) data)))))))
-
-(defn- binding-matcher [P]
-  (wrap-meta
-   (fn [matches _rules data]
-     (if (contains? matches P)
-       (if (= data (get matches P))
-         (list matches)
-         ())
-       (list (assoc matches P data))))))
-
-(defn clean-matches [matches]
-  (into {}
-        (filter #(not (placeholder? (first %))))
-        matches))
+        M (map-matcher m)]
+    (with-meta
+      (fn [matches data]
+        (when (set? data)
+          (M matches (into {} (map (fn [v] [v v])) data))))
+      {::matcher? true})))
 
 (defn- matcher* [P]
   (cond
-    (and (fn? P)
-         (::matcher? (meta P)))
+    (::matcher? (meta P))
     P
 
     (set? P)
@@ -255,71 +206,47 @@
     (map-matcher P)
 
     (sequential? P)
-    (cond
-      (control-symbol? (first P))
-      (apply (combinator (first P)) (rest P))
+    (seq-matcher P)
 
-      (dynamic-rule? (first P))
-      (dynamic-rule-matcher P)
-
-      :else
-      (seq-matcher P))
-
-    (symbol-type P)
-    (case (symbol-type P)
-      ::placeholder
-      (if (> (count (name P)) 1)
-        (binding-matcher P)
-        (wrap-meta
-         (fn [matches _rules _data]
-           (list matches))))
-
-      ::rule
-      (wrap-meta
-       (fn [matches rules data]
-         (if-let [M (get rules P)]
-           (M matches rules data)
-           (throw (ex-info "Undefined rule" {:rule P})))))
-
-      ::binding
-      (binding-matcher P)
-
-      ::memo-binding
-      (wrap-meta
-       (fn [matches _rules data]
-         (list (update matches P (fnil conj []) data)))))
+    (logic-var? P)
+    (case (first (name P))
+      \? (binding-matcher P)
+      \! (memo-binding-matcher P)
+      \_ (placeholder-matcher P))
 
     :else
-    (wrap-meta
-     (fn [matches _rules data]
-       (if (= data P)
-         (list matches)
-         ())))))
+    (data-matcher P)))
+
+(defn clean-matches [matches]
+  (reduce-kv
+   (fn [m k v]
+     (if (= \_ (first (name k)))
+       m
+       (assoc m k v)))
+   {}
+   matches))
 
 (defn matcher [P]
   (let [M (matcher* P)]
-    (wrap-meta
-     (fn f
-       ([data] (f {} {} data))
-       ([matches data] (f matches {} data))
-       ([matches rules data]
-        (sequence
-         (map clean-matches)
-         (M matches rules data)))))))
+    (with-meta
+      (fn f
+        ([data] (f {} data))
+        ([matches data]
+         (sequence
+          (map clean-matches)
+          (M matches data))))
+      {::matcher? true})))
 
 (defn matches
-  ([pattern data] (matches pattern {} {} data))
-  ([pattern rules data] (matches pattern {} rules data))
-  ([pattern init-matches rules data]
-   (let [rules (reduce-kv #(assoc %1 %2 (if (fn? %3) %3 (matcher %3))) {} rules)]
-     (sequence
-      (map clean-matches)
-      (if (fn? pattern)
-        (pattern init-matches rules data)
-        ((matcher pattern) init-matches rules data))))))
+  ([pattern data] (matches pattern {} data))
+  ([pattern init-matches data]
+   (sequence
+    (map clean-matches)
+    (if (fn? pattern)
+      (pattern init-matches data)
+      ((matcher pattern) init-matches data)))))
 
 (defn match?
-  ([pattern data] (match? pattern {} {} data))
-  ([pattern rules data] (match? pattern {} rules data))
-  ([pattern init-matches rules data]
-   (boolean (seq (matches pattern init-matches rules data)))))
+  ([pattern data] (match? pattern {} data))
+  ([pattern init-matches data]
+   (boolean (seq (matches pattern init-matches data)))))
