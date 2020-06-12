@@ -2,16 +2,23 @@
   (:refer-clojure :exclude [not conj disj var?])
   (:require [clojure.math.combinatorics :as combo]
             [clojure.string :as string]
-            [#?(:clj clojure.core :cljs cljs.core) :as cc]))
+            [#?(:clj clojure.core :cljs cljs.core) :as cc])
+  #?(:clj (:import (clojure.lang IFn))))
 
 (defn- var? [P]
   (and (keyword? P) (some #(string/starts-with? (name P) %) ["?" "!" "_"])))
+
+(defn binding? [P]
+  (and (keyword? P) (string/starts-with? (name P) "?")))
 
 (defprotocol Pattern
   (matches [this data] [this precondition data]))
 
 (defprotocol Matcher
   (match? [this data] [this precondition data]))
+
+(defprotocol BindingGuard
+  (probe [this data]))
 
 (defn pattern? [P]
   (or (satisfies? Pattern P)
@@ -173,8 +180,15 @@
   (reify Pattern
     (matches [_ precondition data]
       (if (contains? precondition P)
-        (if (= data (get precondition P))
+        (cond
+          (satisfies? BindingGuard (get precondition P))
+          (when (probe (get precondition P) data)
+            (list (assoc precondition P data)))
+
+          (= data (get precondition P))
           (list precondition)
+
+          :else
           ())
         (list (assoc precondition P data))))))
 
@@ -239,4 +253,9 @@
       (matches [this data]
         (matches this {} data))
       (matches [this precondition data]
-        (matches P precondition data)))))
+        (matches P precondition data))
+      IFn
+      (#?(:clj invoke :cljs -invoke) [_ data]
+        (matches P {} data))
+      (#?(:clj invoke :cljs -invoke) [_ preconditions data]
+        (matches P preconditions data)))))
