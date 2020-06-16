@@ -1,15 +1,7 @@
-(ns matchete.logic
-  (:refer-clojure :exclude [not conj disj var?])
+(ns matchete.lang
   (:require [clojure.math.combinatorics :as combo]
-            [clojure.string :as string]
-            [#?(:clj clojure.core :cljs cljs.core) :as cc])
+            [clojure.string :as string])
   #?(:clj (:import (clojure.lang IFn))))
-
-(defn- var? [P]
-  (and (keyword? P) (some #(string/starts-with? (name P) %) ["?" "!" "_"])))
-
-(defn binding? [P]
-  (and (keyword? P) (string/starts-with? (name P) "?")))
 
 (defprotocol Pattern
   (matches [this data] [this precondition data]))
@@ -17,97 +9,42 @@
 (defprotocol Matcher
   (match? [this data] [this precondition data]))
 
-(defprotocol BindingGuard
-  (probe [this data]))
+;; TODO delayed matchers
+;; (defprotocol TmpValue
+;;   (-value [this]))
+
+;; (defprotocol Checks
+;;   (-checks [this])
+;;   (-ok? [this preconditions value]))
+
+;; (defn add-check-fn
+;;   ([f]
+;;    (reify Checks
+;;      (-checks [_] [f])
+;;      (-ok? [this preconditions value]
+;;        (filter #(not (% preconditions value)) (-checks this)))))
+;;   ([checks f]
+;;    (reify Checks
+;;      (-checks [_] (conj (-checks checks) f))
+;;      (-ok? [this preconditions value]
+;;        (filter #(not (% preconditions value)) (-checks this))))))
+
+(defn- lvar? [P]
+  (and (keyword? P) (some #(string/starts-with? (name P) %) ["?" "!" "_"])))
+
+;; (defn binding? [P]
+;;   (and (keyword? P) (string/starts-with? (name P) "?")))
 
 (defn pattern? [P]
   (or (satisfies? Pattern P)
-      (var? P)
+      (lvar? P)
       (and ((some-fn map? sequential? set?) P)
            (some pattern? P))))
 
-(declare matcher pattern*)
-
-(defn conj
-  "conj[unction] of multiple patterns."
-  [& patterns]
-  (let [MS (mapv pattern* patterns)]
-    (reify Pattern
-      (matches [_ precondition data]
-        (reduce
-         (fn [ms M]
-           (or
-            (seq (mapcat #(matches M % data) ms))
-            (reduced ())))
-         (list precondition)
-         MS)))))
-
-(defn disj
-  "disj[unction] of multiple patterns."
-  [& patterns]
-  (let [MS (mapv pattern* patterns)]
-    (reify Pattern
-      (matches [_ precondition data]
-        (reduce
-         (fn [ms M]
-           (if-let [ms (seq (matches M precondition data))]
-             (reduced ms)
-             ms))
-         ()
-         MS)))))
-
-(defn not [pattern]
-  (let [M (matcher pattern)]
-    (reify Pattern
-      (matches [_ preconditions data]
-        (when-not (match? M preconditions data)
-          (list preconditions))))))
-
-(defn each
-  ([item-pattern]
-   (let [M (pattern* item-pattern)]
-     (reify Pattern
-       (matches [_ preconditions data]
-         (when (sequential? data)
-           (reduce
-            (fn [ms [M data]]
-              (mapcat #(matches M % data) ms))
-            (list preconditions)
-            (map vector (repeat (count data) M) data)))))))
-  ([index-pattern item-pattern]
-   (let [M (each [index-pattern item-pattern])]
-     (reify Pattern
-       (matches [_ preconditions data]
-         (matches M preconditions (map-indexed vector data)))))))
-
-(defn scan
-  ([item-pattern]
-   (let [M (pattern* item-pattern)]
-     (reify Pattern
-       (matches [_ preconditions data]
-         (when ((some-fn sequential? map? set?) data)
-           (mapcat #(matches M preconditions %) data))))))
-  ([index-pattern item-pattern]
-   (let [M (pattern* [index-pattern item-pattern])]
-     (reify Pattern
-       (matches [_ preconditions data]
-         (when ((some-fn sequential? map? set?) data)
-           (cond
-             (sequential? data)
-             (apply concat
-                    (map-indexed
-                     (fn [i v]
-                       (matches M preconditions [i v]))
-                     data))
-
-             (map? data)
-             (mapcat (fn [[k v]] (matches M preconditions [k v])) data)
-
-             (set? data)
-             (mapcat (fn [v] (matches M preconditions [v v])) data))))))))
+(declare pattern matcher)
 
 (defn- simple-map-pattern [P]
-  (let [M (reduce-kv #(assoc %1 %2 (pattern* %3)) {} P)]
+  (let [M (reduce-kv #(assoc %1 %2 (pattern %3)) {} P)]
     (reify Pattern
       (matches [_ preconditions data]
         (reduce-kv
@@ -119,7 +56,7 @@
          M)))))
 
 (defn- complex-map-pattern [P]
-  (let [M (pattern* (seq P))]
+  (let [M (pattern (seq P))]
     (reify Pattern
       (matches [_ preconditions data]
         (when (>= (count data)
@@ -160,12 +97,12 @@
           (sequence
            (map #(into {}
                        (filter (fn [[k _]]
-                                 (cc/not (string/starts-with? (name k) key-prefix))))
+                                 (not (string/starts-with? (name k) key-prefix))))
                        %))
            (matches M preconditions (into {} (map (fn [v] [v v])) data))))))))
 
-(defn- seq-pattern [patterns-list]
-  (let [MS (mapv pattern* patterns-list)]
+(defn- seq-pattern [PS]
+  (let [MS (mapv pattern PS)]
     (reify Pattern
       (matches [_ preconditions data]
         (when (and (sequential? data)
@@ -178,24 +115,38 @@
 
 (defn- binding-pattern [P]
   (reify Pattern
-    (matches [_ precondition data]
-      (if (contains? precondition P)
-        (cond
-          (satisfies? BindingGuard (get precondition P))
-          (when (probe (get precondition P) data)
-            (list (assoc precondition P data)))
+    (matches [_ preconditions data]
+      (if (contains? preconditions P)
+        (let [val (get preconditions P)]
+          (cond
+            ;; TODO descide based on TmpValue
+            ;; (satisfies? TmpValue val)
+            ;; (when (= data (-value val))
+            ;;   (list preconditions))
 
-          (= data (get precondition P))
-          (list precondition)
+            ;; TODO fire all the checks associated with logical var
+            ;; (satisfies? Checks val)
+            ;; (if-let [pending-checks (seq (-ok? val preconditions data))]
+            ;;   (list (assoc preconditions P (reify
+            ;;                                  Checks
+            ;;                                  (-checks [_] pending-checks)
+            ;;                                  (-ok? [this preconditions value]
+            ;;                                    (filter #(not (% preconditions value)) (-checks this)))
+            ;;                                  TmpValue
+            ;;                                  (-value [_] data))))
+            ;;   (list (assoc preconditions P data)))
 
-          :else
-          ())
-        (list (assoc precondition P data))))))
+            (= data val)
+            (list preconditions)
+
+            :else
+            ()))
+        (list (assoc preconditions P data))))))
 
 (defn- memo-binding-pattern [P]
   (reify Pattern
     (matches [_ precondition data]
-      (list (update precondition P (fnil cc/conj []) data)))))
+      (list (update precondition P (fnil conj []) data)))))
 
 (defn- placeholder-pattern [P]
   (if (> (count (name P)) 1)
@@ -211,7 +162,23 @@
       (when (= data value)
         (list precondition)))))
 
-(defn- pattern* [P]
+(defn- clean-matches [matches]
+  (reduce-kv
+   (fn [m k v]
+     (cond
+       (= \_ (first (name k)))
+       m
+
+       ;; TODO extract value from TmpValue
+       ;; (satisfies? TmpValue v)
+       ;; (assoc m k (-value v))
+
+       :else
+       (assoc m k v)))
+   {}
+   matches))
+
+(defn pattern [P]
   (cond
     (satisfies? Pattern P) P
 
@@ -224,7 +191,7 @@
     (sequential? P)
     (seq-pattern P)
 
-    (var? P)
+    (lvar? P)
     (case (first (name P))
       \? (binding-pattern P)
       \! (memo-binding-pattern P)
@@ -232,17 +199,8 @@
 
     :else (data-pattern P)))
 
-(defn clean-matches [matches]
-  (reduce-kv
-   (fn [m k v]
-     (if (= \_ (first (name k)))
-       m
-       (assoc m k v)))
-   {}
-   matches))
-
-(defn matcher [pattern]
-  (let [P (pattern* pattern)]
+(defn matcher [P]
+  (let [P (pattern P)]
     (reify
       Matcher
       (match? [this data]
@@ -255,7 +213,7 @@
       (matches [this precondition data]
         (matches P precondition data))
       IFn
-      (#?(:clj invoke :cljs -invoke) [_ data]
-        (matches P {} data))
+      (#?(:clj invoke :cljs -invoke) [this data]
+        (this {} data))
       (#?(:clj invoke :cljs -invoke) [_ preconditions data]
-        (matches P preconditions data)))))
+        (sequence (map clean-matches) (matches P preconditions data))))))

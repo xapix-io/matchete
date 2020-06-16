@@ -1,5 +1,5 @@
 (ns example.graph
-  (:require [matchete.logic :as logic]))
+  (:require [matchete.lang :as ml]))
 
 (def city-to-city-distance
   #{["Berlin" #{["New York" 14] ["London" 2] ["Tokyo" 14] ["Vancouver" 13]}]
@@ -9,13 +9,13 @@
     ["Vancouver" #{["Berlin" 13] ["New York" 6] ["London" 10] ["Tokyo" 12]}]})
 
 (def calculate-distance
-  (reify logic/Pattern
+  (reify ml/Pattern
     (matches [_ preconditions data]
       (list (update preconditions :?distance (fnil + 0) data)))))
 
 (defn generate-matcher [cities-count]
   (let [l (range cities-count)]
-    (logic/matcher
+    (ml/matcher
      (into #{}
            (map (fn [[n1 n2]]
                   [(keyword (str "?" n1))
@@ -30,7 +30,7 @@
   (let [{:keys [?distance]}
         (first
          (sort-by :?distance
-                  (logic/matches (generate-matcher (count db))
-                                 {:?0 start}
-                                 db)))]
+                  (ml/matches (generate-matcher (count db))
+                              {:?0 start}
+                              db)))]
     ?distance))
