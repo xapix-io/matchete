@@ -9,6 +9,7 @@
                        lambdaisland/kaocha-cljs {:mvn/version "0.0-71"}}}
 
   :+dev {:extra-paths ["dev"]
-         :extra-deps {criterium {:mvn/version "0.4.5"}}}
+         :extra-deps {criterium {:mvn/version "0.4.5"}
+                      meander/epsilon {:mvn/version "0.0.421"}}}
 
   :+cljs {:extra-deps {org.clojure/clojurescript {:mvn/version "1.10.764"}}}}}

@@ -1,5 +1,5 @@
 (ns example.graph
-  (:require [matchete.lang :as ml]))
+  (:require [matchete.core :as ml]))
 
 (def city-to-city-distance
   #{["Berlin" #{["New York" 14] ["London" 2] ["Tokyo" 14] ["Vancouver" 13]}]
@@ -8,29 +8,32 @@
     ["Tokyo" #{["Berlin" 14] ["New York" 18] ["London" 15] ["Vancouver" 12]}]
     ["Vancouver" #{["Berlin" 13] ["New York" 6] ["London" 10] ["Tokyo" 12]}]})
 
-(def calculate-distance
-  (reify ml/Pattern
-    (matches [_ preconditions data]
-      (list (update preconditions :?distance (fnil + 0) data)))))
+(defn add-distance [distance path]
+  (+ (or distance 0) path))
 
 (defn generate-matcher [cities-count]
   (let [l (range cities-count)]
-    (ml/matcher
-     (into #{}
-           (map (fn [[n1 n2]]
-                  [(keyword (str "?" n1))
-                   #{[(keyword (str "?" n2)) calculate-distance]}]))
-           (take cities-count (map vector (cycle l) (rest (cycle l))))))))
+    (into #{}
+          (map (fn [[n1 n2]]
+                 [(symbol (str "?" n1))
+                  #{[(symbol (str "?" n2)) (ml/aggregate add-distance '?distance)]}]))
+          (take cities-count (map vector (cycle l) (rest (cycle l)))))))
 
 (defn shortest-path
   {:test #(do
             (assert
              (= 46 (shortest-path city-to-city-distance "Berlin"))))}
   [db start]
-  (let [{:keys [?distance]}
+  (let [{:syms [?distance]}
         (first
-         (sort-by :?distance
+         (sort-by #(get % '?distance)
                   (ml/matches (generate-matcher (count db))
-                              {:?0 start}
+                              {'?0 start}
                               db)))]
     ?distance))
+
+(comment
+
+  (shortest-path city-to-city-distance "Berlin")
+
+  )
