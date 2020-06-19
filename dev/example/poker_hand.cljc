@@ -82,11 +82,11 @@
                 (if (> new-rank (or old-rank 0))
                   new-card
                   old-card))
-      p (hand-pattern [(ml/aggregate aggr-fn :high-card)
-                       (ml/aggregate aggr-fn :high-card)
-                       (ml/aggregate aggr-fn :high-card)
-                       (ml/aggregate aggr-fn :high-card)
-                       (ml/aggregate aggr-fn :high-card)])]
+      p (hand-pattern [(ml/aggregate-by aggr-fn :high-card)
+                       (ml/aggregate-by aggr-fn :high-card)
+                       (ml/aggregate-by aggr-fn :high-card)
+                       (ml/aggregate-by aggr-fn :high-card)
+                       (ml/aggregate-by aggr-fn :high-card)])]
   (defn high-card [hand]
     (:high-card (first (ml/matches p hand)))))
 

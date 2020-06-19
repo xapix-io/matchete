@@ -67,11 +67,13 @@
       {:pattern true})))
 
 (defn- complex-set-pattern [P]
-  (let [M (pattern (seq P))]
-    (fn [data ms]
-      (mapcat #(M % ms)
-              (filter #(apply distinct? %)
-                      (combo/selections data (count P)))))))
+  (if (empty? P)
+    (fn [_data ms] ms)
+    (let [M (pattern (seq P))]
+      (fn [data ms]
+        (mapcat #(M % ms)
+                (filter #(apply distinct? %)
+                        (combo/selections data (count P))))))))
 
 (defn- set-pattern [P]
   (let [{scalar-items false variable-items true} (group-by pattern? P)
@@ -152,6 +154,8 @@
 
     :else
     (data-pattern P)))
+
+(def memoized-pattern (memoize pattern))
 
 (defn scan
   ([P]
@@ -241,7 +245,7 @@
           ms)))
      {:pattern true})))
 
-(defn aggregate
+(defn aggregate-by
   ([aggr-fn]
    (with-meta
      (fn [data ms]
@@ -252,7 +256,7 @@
         ms))
      {:pattern true}))
   ([aggr-fn dest]
-   (aggregate #(update %1 dest aggr-fn %2))))
+   (aggregate-by #(update %1 dest aggr-fn %2))))
 
 (defn- find-lvars [expr]
   (cond
@@ -284,23 +288,40 @@
         (fn [data# ms#]
           (letfn [(f# [~m]
                     (if (every? #(contains? ~m %) ~(mapv (fn [s] `(symbol ~(name s))) lvars))
-                      (let [{:syms ~(vec lvars)} ~m]
+                      (let [{:syms ~(vec lvars) :as x#} ~m]
                         (= data# ~expr))
                       f#))]
             (check-guard f# ms#)))
         {:pattern true})
       ~@(if dest `((symbol ~(name dest))) ()))))
 
+(defmacro defpattern [name P]
+  `(def ~name
+     (with-meta
+       (fn [data# ms#]
+         ((memoized-pattern ~P) data# ms#))
+       {:pattern true})))
+
+(defmacro defnpattern [name args P]
+  `(def ~name
+     (with-meta
+       (fn [data# ms#]
+         (sequence
+          (mapcat (fn [m#]
+                    (let [P# (memoized-pattern ((fn ~args ~P) m#))]
+                      (P# data# [m#]))))
+          ms#))
+       {:pattern true})))
+
 (defn result-of [f & [dest]]
   (let [lvars (:lvars (meta f))
         guard (with-meta
                 (fn [data ms]
-                  (let [f (f data)]
-                    (letfn [(f' [m]
-                              (if (every? #(contains? m %) lvars)
-                                (f m)
-                                f'))]
-                      (check-guard f' ms))))
+                  (letfn [(f' [m]
+                            (if (every? #(contains? m %) lvars)
+                              (= data (f m))
+                              f'))]
+                    (check-guard f' ms)))
                 {:pattern true})]
     (if dest
       (and guard dest)
@@ -327,4 +348,7 @@
 (defn matches
   ([M data] (matches M {} data))
   ([M preconditions data]
-   ((if (:matcher (meta M)) M (matcher M)) data preconditions)))
+   (sequence
+    (map (fn [m]
+           (into {} (remove #(placeholder? (first %))) m)))
+    ((if (:matcher (meta M)) M (matcher M)) data preconditions))))

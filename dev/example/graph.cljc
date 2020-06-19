@@ -16,7 +16,7 @@
     (into #{}
           (map (fn [[n1 n2]]
                  [(symbol (str "?" n1))
-                  #{[(symbol (str "?" n2)) (ml/aggregate add-distance '?distance)]}]))
+                  #{[(symbol (str "?" n2)) (ml/aggregate-by add-distance '?distance)]}]))
           (take cities-count (map vector (cycle l) (rest (cycle l)))))))
 
 (defn shortest-path
