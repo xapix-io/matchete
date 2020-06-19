@@ -1,8 +1,8 @@
 (ns matchete.core
   (:refer-clojure :rename {some core-some
                            and core-and
-                           or core-or
-                           not core-not})
+                           or core-or}
+                  :exclude [not])
   (:require [clojure.math.combinatorics :as combo]
             [clojure.set :as set]))
 
@@ -91,31 +91,22 @@
 (defn- lvar-pattern [P]
   (with-meta
     (fn [data ms]
-      (reduce
-       (fn [ms m]
-         (cond
-           (core-and (contains? m P)
-                     (not= data (get m P)))
-           ms
-
-           (core-not (contains? m P))
-           (let [{::keys [guards] :as m} (assoc m P data)]
-             (if-let [m (if (not-empty guards)
-                          (reduce
-                           (fn [m guard]
-                             (case (guard m)
-                               true m
-                               false (reduced nil)
-                               (update m ::guards conj guard)))
-                           (assoc m ::guards [])
-                           guards)
-                          m)]
-               (conj ms m)
-               ms))
-
-           (= data (get m P))
-           (conj ms m)))
-       ()
+      (sequence
+       (comp
+        (remove #(core-and (contains? % P) (not= data (get % P))))
+        (map (fn [m]
+               (core-or (core-and (contains? m P) m)
+                        (let [{::keys [guards] :as m} (assoc m P data)]
+                          (core-or (core-and (empty? guards) m)
+                                   (reduce
+                                    (fn [m guard]
+                                      (case (guard m)
+                                        true m
+                                        false (reduced nil)
+                                        (update m ::guards conj guard)))
+                                    (assoc m ::guards [])
+                                    guards))))))
+        (filter some?))
        ms))
     {:pattern true}))
 

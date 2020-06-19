@@ -6,7 +6,7 @@
                :cljs [cljs.test :refer [deftest are is] :include-macros true])))
 
 (deftest poker-hand
-  (are [hand res] (= (ph/poker-hand hand) res)
+  (are [hand res] (= res (ph/poker-hand hand))
     #{[:♣ 10] [:♣ 14] [:♣ 12] [:♣ 13] [:♣ 11]} "Royal flush"
 
     #{[:♠ 5] [:♠ 6] [:♠ 7] [:♠ 8] [:♠ 9]} "Straight flush"
@@ -110,8 +110,7 @@
   ((fnil conj []) path step))
 
 (mc/defpattern tree-walk
-  (mc/or (mc/scan (mc/aggregate-by conj-path '?path)
-                  tree-walk)
+  (mc/or (mc/scan (mc/aggregate-by conj-path '?path) tree-walk)
          '?leaf))
 
 (mc/defnpattern limited-tree-walk [{:syms [?path]}]
