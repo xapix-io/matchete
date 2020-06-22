@@ -160,6 +160,16 @@
   (is (mc/match? (mc/not (mc/predicate string?)) 42))
   (is (not (mc/match? (mc/not (mc/predicate string?)) "42"))))
 
+(deftest if-pattern
+  (let [M (mc/lif (mc/predicate string?) '?this-is-a-string (mc/lif (mc/predicate number?) '?this-is-a-number '?i-dont-know-what-it-is))]
+    (is (= ['{?this-is-a-string "string"}]
+           (mc/matches M "string")))
+    (is (= ['{?this-is-a-number 42}]
+           (mc/matches M 42)))
+    (is (= ['{?i-dont-know-what-it-is true}]
+           (mc/matches M true))))
+  (is (not (mc/match? (mc/lif 42 '?forty-two) 43))))
+
 (comment
 
   (mc/matches (mc/and (mc/scan (mc/formula (Math/sqrt (+ (Math/pow ?x 2) (Math/pow ?y 2))) ?z))

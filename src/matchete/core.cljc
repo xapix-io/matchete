@@ -221,6 +221,21 @@
           ms))
       {:pattern true})))
 
+(defn lif
+  ([cond-pattern then-pattern]
+   (lif cond-pattern then-pattern ::empty))
+  ([cond-pattern then-pattern else-pattern]
+   (let [cond-m (pattern cond-pattern)
+         then-m (pattern then-pattern)
+         else-m (when (not= ::empty else-pattern)
+                  (pattern else-pattern))]
+     (with-meta
+       (fn [data ms]
+         (if-let [ms' (seq (cond-m data ms))]
+           (then-m data ms')
+           (when else-m (else-m data ms))))
+       {:pattern true}))))
+
 (defn predicate
   ([pred]
    (predicate pred nil))
