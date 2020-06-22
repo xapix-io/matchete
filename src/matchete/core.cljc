@@ -168,22 +168,33 @@
            (apply concat (map-indexed #(M [%1 %2] ms) data))))
        {:pattern true}))))
 
-(defn each
-  ([P] (each P false))
-  ([P skip-fail?]
-   (let [M (pattern P)]
-     (with-meta
-       (fn [data ms]
-         (when (sequential? data)
-           (reduce
-            (fn [ms item]
-              (core-or (seq (M item ms)) (if skip-fail? ms (reduced ()))))
-            ms
-            data)))
-       {:pattern true}))))
+(defn each [P]
+  (let [M (pattern P)]
+    (with-meta
+      (fn [data ms]
+        (when (sequential? data)
+          (reduce
+           (fn [ms item]
+             (core-or (seq (M item ms)) (reduced ())))
+           ms
+           data)))
+      {:pattern true})))
 
 (defn some [P]
-  (each P true))
+  (let [M (pattern P)]
+    (with-meta
+      (fn [data ms]
+        (when (sequential? data)
+          (let [[found-one? ms]
+                (reduce
+                 (fn [[found-one? ms] item]
+                   (if-let [ms' (seq (M item ms))]
+                     [true ms']
+                     [found-one? ms]))
+                 [false ms]
+                 data)]
+            (if found-one? ms ()))))
+      {:pattern true})))
 
 (defn and
   ([P] (pattern P))
@@ -263,6 +274,13 @@
      {:pattern true}))
   ([aggr-fn dest]
    (aggregate-by #(update %1 dest aggr-fn %2))))
+
+(defn reshape-by [tr-fn P]
+  (let [M (pattern P)]
+    (with-meta
+      (fn [data ms]
+        (M (tr-fn data) ms))
+      {:pattern true})))
 
 (defn- find-lvars [expr]
   (cond

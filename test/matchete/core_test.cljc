@@ -3,7 +3,8 @@
             [example.poker-hand :as ph]
             [example.graph :as g]
             #?(:clj [clojure.test :refer [deftest are is]]
-               :cljs [cljs.test :refer [deftest are is] :include-macros true])))
+               :cljs [cljs.test :refer [deftest are is] :include-macros true]))
+  #?(:clj (:import (clojure.lang ExceptionInfo))))
 
 (deftest poker-hand
   (are [hand res] (= res (ph/poker-hand hand))
@@ -130,6 +131,16 @@
            {?path [:y], ?leaf 42}]
          (mc/matches limited-tree-walk {:x {:x {:x {:x 1}}}
                                         :y 42}))))
+
+(deftest reshape-test
+  (is (= '[{?ex-message "message 1"}
+           {?ex-message "message 3"}]
+         (mc/matches (mc/scan (mc/and (mc/predicate #(instance? ExceptionInfo %))
+                                      (mc/reshape-by (juxt ex-message ex-data)
+                                                     ['?ex-message {:type :A}])))
+                     [(ex-info "message 1" {:type :A})
+                      (ex-info "message 2" {:type :B})
+                      (ex-info "message 3" {:type :A})]))))
 
 (deftest each-pattern
   (is (not (mc/match? (mc/each 42) [42 3 42])))
