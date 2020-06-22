@@ -62,6 +62,16 @@
            {:x "qwe"} true
            {:x 42} true}))))
 
+(deftest seq-pattern
+  (is (not (mc/match? '[?_ ?_] [1])))
+  (is (not (mc/match? '[] 42)))
+  (is (mc/match? '[?_ ?_] [1 2]))
+  (is (mc/match? '[?_ ?_] [1 2 3]))
+  (is (= '[{?x 1}] (mc/matches '[?x ?x ?x] [1 1 1 2])))
+  (is (= '[{?x 1 ?y 2 ?z 3}]
+         (mc/matches '[?x ?y & [?x ?y ?z]]
+                     [1 2 1 2 3]))))
+
 (deftest set-pattern
   (is (= [{}]
          ((mc/matcher #{1 2 3}) #{1 2 3 4 5})))
@@ -84,6 +94,8 @@
          ((mc/matcher [(mc/formula (+ ?x 20)) '?x]) [42 23])))
   (is (= [{'?x 22 '?y 42}]
          ((mc/matcher [(mc/formula (+ ?x 20) ?y) '?x]) [42 22])))
+  (is (= [{'?x 22 '?y 42}]
+         ((mc/matcher ['?x (mc/formula (+ ?x 20) ?y)]) [22 42])))
   (is (= [{'?x 22 '?y 1}]
          ((mc/matcher [(mc/formula (+ ?x 20)) (mc/formula (* ?y ?x 10)) '?x '?y]) [42 220 22 1]))))
 
@@ -147,7 +159,8 @@
   (is (mc/match? (mc/each 42) [42 42 42])))
 
 (deftest some-pattern
-  (is (mc/match? (mc/some 42) [42 3 42])))
+  (is (mc/match? (mc/some 42) [42 3 42]))
+  (is (not (mc/match? (mc/some 42) [1 2 3]))))
 
 (deftest predicate-pattern
   (is (mc/match? (mc/matcher (mc/each (mc/predicate string?))) ["qwe" "rty" "uio"]))

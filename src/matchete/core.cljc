@@ -55,15 +55,19 @@
       {:pattern true})))
 
 (defn- seq-pattern [P]
-  (let [P (mapv pattern P)]
+  (let [[P [_ TP :as tail]] (split-with #(not= '& %) P)
+        P (mapv pattern P)
+        TP (when (seq tail) (pattern TP))]
     (with-meta
       (fn [data ms]
-        (when (sequential? data)
+        (when (core-and (sequential? data)
+                        (>= (count data) (count P)))
           (reduce
            (fn [ms [P data]]
              (core-or (seq (P data ms)) (reduced ())))
            ms
-           (partition 2 (interleave P data)))))
+           (concat (partition 2 (interleave P data))
+                   (when TP (list [TP (drop (count P) data)]))))))
       {:pattern true})))
 
 (defn- complex-set-pattern [P]
