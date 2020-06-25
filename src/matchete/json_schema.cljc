@@ -24,8 +24,6 @@
                                            "object"  :object)
     default                              :allow-all))
 
-(def json-schema->pattern nil)
-
 (defmulti json-schema->pattern subschema-type)
 
 (defmethod json-schema->pattern :allow-all [path _]
@@ -177,32 +175,3 @@
 
 (defmethod json-schema->pattern "not" [path {:strs [not]}]
   [:not (json-schema->pattern (conj path "not") not)])
-
-(comment
-
-  (require '[matchete.data-form :as df]
-           '[matchete.core :as mc]
-           '[clojure.java.io :as io]
-           '[cheshire.core :as json])
-
-  (json-schema->pattern ["#"] {"definitions" {"foo" {"const" 42}
-                                              "bar" {"const" 43}}
-                               "const" [1 2 3]})
-
-  (json-schema->pattern ["#"] {"type" ["null" "string"]
-                               "minLength" 3})
-
-  (json-schema->pattern ["#"] {"anyOf" [{"type" "string" "maxLength" 3}
-                                        {"type" "number" "minimum" 0}]})
-
-  (mc/match? (df/make-pattern (json-schema->pattern ["#"] {"type" "array" "minItems" 2 "maxItems" 4}))
-             [1 3 4 5])
-
-  (let [M (df/make-pattern
-           (json-schema->pattern ["#"]
-                                 (json/parse-string (slurp (io/resource "draft_07.json")))))
-        data (json/parse-string (slurp (io/resource "project.json")))]
-    (mc/match? M data)
-    #_(mc/match? M {}))
-
-  )
