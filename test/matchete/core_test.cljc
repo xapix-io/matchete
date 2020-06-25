@@ -122,28 +122,6 @@
 (defn conj-path [path step]
   ((fnil conj []) path step))
 
-(mc/defpattern tree-walk
-  (mc/or (mc/scan (mc/aggregate-by conj-path '?path) tree-walk)
-         '?leaf))
-
-(mc/defnpattern limited-tree-walk [{:syms [?path]}]
-  (if (< (count ?path) 3)
-    (mc/or (mc/scan [(mc/aggregate-by conj-path '?path) limited-tree-walk])
-           '?leaf)
-    '?leaf))
-
-(deftest recursive-pattern
-  (is (= '[{?path [:x 0], ?leaf 1}
-           {?path [:x 1], ?leaf 2}
-           {?path [:x 2 :y], ?leaf "qwe"}
-           {?path [:z], ?leaf 42}]
-         (mc/matches tree-walk {:x [1 2 {:y "qwe"}]
-                                :z 42})))
-  (is (= '[{?path [:x :x :x], ?leaf {:x 1}}
-           {?path [:y], ?leaf 42}]
-         (mc/matches limited-tree-walk {:x {:x {:x {:x 1}}}
-                                        :y 42}))))
-
 (deftest reshape-test
   (is (= '[{?ex-message "message 1"}
            {?ex-message "message 3"}]
@@ -185,14 +163,14 @@
   (is (not (mc/match? (mc/not (mc/predicate string?)) "42"))))
 
 (deftest if-pattern
-  (let [M (mc/lif (mc/predicate string?) '?this-is-a-string (mc/lif (mc/predicate number?) '?this-is-a-number '?i-dont-know-what-it-is))]
+  (let [M (mc/if* (mc/predicate string?) '?this-is-a-string (mc/if* (mc/predicate number?) '?this-is-a-number '?i-dont-know-what-it-is))]
     (is (= ['{?this-is-a-string "string"}]
            (mc/matches M "string")))
     (is (= ['{?this-is-a-number 42}]
            (mc/matches M 42)))
     (is (= ['{?i-dont-know-what-it-is true}]
            (mc/matches M true))))
-  (is (not (mc/match? (mc/lif 42 '?forty-two) 43))))
+  (is (not (mc/match? (mc/if* 42 '?forty-two) 43))))
 
 (comment
 

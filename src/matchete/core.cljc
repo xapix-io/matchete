@@ -9,12 +9,16 @@
 (defn lvar? [x]
   (core-and (simple-symbol? x) (= \? (first (name x)))))
 
+(defn mvar? [x]
+  (core-and (simple-symbol? x) (= \! (first (name x)))))
+
 (defn placeholder? [x]
-  (core-and (lvar? x) (= \_ (second (name x)))))
+  (core-and ((some-fn lvar? mvar?) x)
+            (= \_ (second (name x)))))
 
 (defn pattern? [P]
   (core-or (:pattern (meta P))
-           (lvar? P)
+           ((some-fn lvar? mvar?) P)
            (core-and ((some-fn map? sequential? set?) P)
                      (core-some pattern? P))))
 
@@ -127,31 +131,6 @@
       (when (= data P) ms))
     {:pattern true}))
 
-(defn pattern [P]
-  (cond
-    (:pattern (meta P))
-    P
-
-    (map? P)
-    (map-pattern P)
-
-    (set? P)
-    (set-pattern P)
-
-    (sequential? P)
-    (seq-pattern P)
-
-    (placeholder? P)
-    (placeholder-pattern P)
-
-    (lvar? P)
-    (lvar-pattern P)
-
-    :else
-    (data-pattern P)))
-
-(def memoized-pattern (memoize pattern))
-
 (defn scan
   ([P]
    (let [M (pattern P)]
@@ -228,6 +207,26 @@
           MS))
        {:pattern true}))))
 
+(defn only-one
+  ([P] (pattern P))
+  ([P & PS]
+   (let [MS (mapv pattern (list* P PS))]
+     (with-meta
+       (fn [data ms]
+         (second
+          (reduce
+           (fn [[ok-already? ms' :as r] M]
+             (if ok-already?
+               (if (seq (M data ms))
+                 (reduced [false ()])
+                 r)
+               (if-let [ms' (seq (M data ms))]
+                 [true ms']
+                 [ok-already? ms'])))
+           [false ()]
+           MS)))
+       {:pattern true}))))
+
 (defn not [P]
   (let [M (pattern P)]
     (with-meta
@@ -236,9 +235,9 @@
           ms))
       {:pattern true})))
 
-(defn lif
+(defn if*
   ([cond-pattern then-pattern]
-   (lif cond-pattern then-pattern ::empty))
+   (if* cond-pattern then-pattern ::empty))
   ([cond-pattern then-pattern else-pattern]
    (let [cond-m (pattern cond-pattern)
          then-m (pattern then-pattern)
@@ -250,6 +249,22 @@
            (then-m data ms')
            (when else-m (else-m data ms))))
        {:pattern true}))))
+
+(defn open-map [map-pattern]
+  (let [M (into {} (map (fn [[k v]]
+                          [k (pattern v)]))
+                map-pattern)]
+    (with-meta
+      (fn [data ms]
+        (when (map? data)
+          (reduce-kv
+           (fn [ms k v]
+             (if (contains? M k)
+               (core-or (seq ((get M k) v ms)) (reduced ()))
+               ms))
+           ms
+           data)))
+      {:pattern true})))
 
 (defn predicate
   ([pred]
@@ -266,6 +281,14 @@
           ms)))
      {:pattern true})))
 
+(defn guard [pred]
+  (with-meta
+    (fn [_ ms]
+      (sequence
+       (filter pred)
+       ms))
+    {:pattern true}))
+
 (defn aggregate-by
   ([aggr-fn]
    (with-meta
@@ -279,6 +302,16 @@
   ([aggr-fn dest]
    (aggregate-by #(update %1 dest aggr-fn %2))))
 
+(defn update-at [dest f]
+  (with-meta
+    (fn [data ms]
+      (sequence
+       (comp
+        (map #(update % dest f data))
+        (filter some?))
+       ms))
+    {:pattern true}))
+
 (defn reshape-by [tr-fn P]
   (let [M (pattern P)]
     (with-meta
@@ -291,7 +324,7 @@
     (coll? expr)
     (set (mapcat find-lvars expr))
 
-    (lvar? expr)
+    ((some-fn lvar? mvar?) expr)
     (list expr)
 
     :else
@@ -323,24 +356,6 @@
         {:pattern true})
       ~@(if dest `((symbol ~(name dest))) ()))))
 
-(defmacro defpattern [name P]
-  `(def ~name
-     (with-meta
-       (fn [data# ms#]
-         ((memoized-pattern ~P) data# ms#))
-       {:pattern true})))
-
-(defmacro defnpattern [name args P]
-  `(def ~name
-     (with-meta
-       (fn [data# ms#]
-         (sequence
-          (mapcat (fn [m#]
-                    (let [P# (memoized-pattern ((fn ~args ~P) m#))]
-                      (P# data# [m#]))))
-          ms#))
-       {:pattern true})))
-
 (defn result-of [f & [dest]]
   (let [lvars (:lvars (meta f))
         guard (with-meta
@@ -354,6 +369,32 @@
     (if dest
       (and guard dest)
       guard)))
+
+(defn pattern [P]
+  (cond
+    (:pattern (meta P))
+    P
+
+    (map? P)
+    (map-pattern P)
+
+    (set? P)
+    (set-pattern P)
+
+    (sequential? P)
+    (seq-pattern P)
+
+    (placeholder? P)
+    (placeholder-pattern P)
+
+    (lvar? P)
+    (lvar-pattern P)
+
+    (mvar? P)
+    (aggregate-by (fnil conj []) (symbol (str "?" (subs (name P) 1))))
+
+    :else
+    (data-pattern P)))
 
 (defn matcher [P]
   (let [M (pattern P)]
