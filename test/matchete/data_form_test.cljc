@@ -6,7 +6,7 @@
 
 (deftest simple
   (is (= [{'?x 1}]
-         (mc/matches (df/make-pattern '[:predicate [:fn (fn [x] true)] ?x]) 1))))
+         (mc/matches (df/make-pattern '[:pred [:fn (fn [x] true)] ?x]) 1))))
 
 (deftest function
   (is (= 3 ((df/make-pattern '[:fn (fn [x] (inc x))]) 2))))
