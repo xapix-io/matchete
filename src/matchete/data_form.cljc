@@ -70,8 +70,8 @@
 (defmethod ->pattern :some [named [_ opts & PS]]
   (save-pattern! opts named (apply mc/some (map (partial ->pattern named) PS))))
 
-(defmethod ->pattern :update-at [named [_ opts & PS]]
-  (save-pattern! opts named (apply mc/update-at PS)))
+(defmethod ->pattern :update-at [named [_ opts dest f]]
+  (save-pattern! opts named (mc/update-at dest (->pattern named f))))
 
 (defmethod ->pattern :pred [named [_ opts & args]]
   (save-pattern! opts named (apply mc/predicate (map (partial ->pattern named) args))))
@@ -80,7 +80,7 @@
   (save-pattern! opts named (mc/guard (->pattern named f))))
 
 (defmethod ->pattern :reshape-by [named [_ opts f P]]
-  (save-pattern! opts named (mc/reshape-by f (->pattern named P))))
+  (save-pattern! opts named (mc/reshape-by (->pattern named f) (->pattern named P))))
 
 (defmethod ->pattern :with-refs [named [_ opts bindings P]]
   (doall (map #(save-pattern! {:id (first %)} named (->pattern (second %)))
