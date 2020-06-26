@@ -1,0 +1,6 @@
+{:lint-as
+ {matchete.core/defnpattern clojure.core/defn
+  matchete.core/defpattern clojure.core/def}
+ :linters
+ {:unresolved-symbol
+  {:exclude [(matchete.core/formula)]}}}

@@ -1,252 +1,13 @@
 (ns matchete.core-test
-  (:require [matchete.core :as sut]
+  (:require [matchete.core :as mc :include-macros true]
             [example.poker-hand :as ph]
             [example.graph :as g]
-            [clojure.string :as string]
-            #?(:clj [clojure.test :refer [deftest is are]]
-               :cljs [cljs.test :refer [deftest is are] :include-macros true]))
+            #?(:clj [clojure.test :refer [deftest are is]]
+               :cljs [cljs.test :refer [deftest are is] :include-macros true]))
   #?(:clj (:import (clojure.lang ExceptionInfo))))
 
-(deftest core-test
-  (is (= ['{?x :x
-            ?y :y
-            ?obj {:x :x
-                  :y :y}
-            ?k 1
-            ?v 1}
-          '{?x :x
-            ?y :y
-            ?obj {:x :x
-                  :y :y}
-            ?k 4
-            ?v 4}]
-         (sut/matches
-          '[1 "qwe" ?x
-            {:x ?x
-             :collections [1 2 3 ?x]}
-            [1 2 3 & _]
-            [1 2 3 4]
-            (cat ?obj {:x ?x
-                       :y ?y})
-            (alt 1 ?x)
-            {?k ?v}
-            #{1 2 3}
-            _]
-          [1 "qwe" :x
-           {:x :x
-            :collections [1 2 3 :x]}
-           [1 2 3 4]
-           [1 2 3 4]
-           {:x :x
-            :y :y}
-           :x
-           {1 1
-            4 4}
-           #{1 2 3}
-           :not-bind]))))
-
-(deftest memo-binding
-  (is (= ['{!foo [1 3]
-            !bar [2 4]}]
-         (sut/matches '[!foo !bar !foo !bar]
-                      [1 2 3 4])))
-  (is (= '({!path [:x :x], ?node 1}
-           {!path [:x :y], ?node []}
-           {!path [:x :x], ?node 1})
-         (sut/matches '{:foo (scan {!path {!path ?node}})}
-                      {:foo [{:x {:x 1 :y []}} {:x {:x 1}}]}))))
-
-(deftest pattern?
-  (is (not (sut/pattern? {:foo 1 :bar 2})))
-  (is (sut/pattern? (with-meta (fn []) {::sut/matcher? true}))))
-
-(deftest scan-pattern
-  (is (empty? (sut/matches '(scan {:foo ?x})
-                           [{:bar 1} {:bar 2}])))
-  (is (empty? (sut/matches '(scan {:foo ?x})
-                           {:foo 1})))
-  (is (= ['{?x 1}]
-         (sut/matches '(scan {:foo ?x})
-                      [{:foo 1}])))
-  (is (= ['{?x 1}
-          '{?x 2}]
-         (sut/matches '(scan {:foo ?x})
-                      [{:foo 1}
-                       {}
-                       {:foo 2}])))
-  (is (= #{'{?x 1} '{?x 2}}
-         (set (sut/matches '(scan {:foo ?x})
-                           #{{:foo 1}
-                             {}
-                             {:foo 2}}))))
-  (is (= #{'{?x 1 ?y 3 ?z 2}
-           '{?x 1 ?y 3 ?z 4}}
-         (set ((sut/matcher '#{?x ?y ?z})
-               '{?x 1
-                 ?y 3}
-               #{1 2 3 4})))))
-
-(deftest scan-indexed-pattern
-  (is (empty? (sut/matches '(scan ?index ?data)
-                           [])))
-  (is (empty? (sut/matches '(scan ?index ?data)
-                           {})))
-  (is (empty? (sut/matches '(scan ?index ?data)
-                           42)))
-  (is (= #{'{?index 1 ?data 2}
-           '{?index 0 ?data 1}
-           '{?index 2 ?data 3}}
-         (set (sut/matches '(scan ?index ?data)
-                           [1 2 3]))
-         (set (sut/matches '(scan ?index ?data)
-                           {0 1
-                            1 2
-                            2 3})))))
-
-(deftest each-test
-  (let [rules {'$even? (fn [matches _ n]
-                         (when ((every-pred number? even?) n)
-                           (list matches)))
-               '$odd? (fn [matches _ n]
-                        (when ((every-pred number? odd?) n)
-                          (list matches)))}]
-    (is (= ['{!odd [1 3], !even [2]}]
-           (sut/matches '(each (alt (cat $even? !even)
-                                    (cat $odd? !odd)))
-                        rules
-                        [1 2 3])))))
-
-(deftest each-indexed-test
-  (let [rules {'$max (fn [{:syms [?max-element ?current-index] :as matches} _ n]
-                       (list (if (and ?max-element
-                                      (> ?max-element n))
-                               (select-keys matches ['?max-element '?max-index])
-                               {'?max-element n
-                                '?max-index ?current-index})))}
-        sample (shuffle (range 100))]
-    (is (= [{'?max-element 99 '?max-index (ffirst (filter (fn [[_ v]] (= v 99))
-                                                          (map-indexed vector sample)))}]
-           (sut/matches '(each ?current-index $max) rules sample)))))
-
-(deftest rule-tests
-  (is (= #{'{!path [:array 1 :x]}
-           '{!path [:foo :bar :baz]}}
-         (set (sut/matches '(scan !path
-                                          (scan !path
-                                                        (scan !path 42)))
-                           {:foo {:bar {:baz 42
-                                        :zab 24}}
-                            :array [{:x 1}
-                                    {:x 42}]}))
-         (set (sut/matches '(def-rule $path-to-42
-                              (scan !path (alt $path-to-42 42)))
-                           {:foo {:bar {:baz 42
-                                        :zab 24}}
-                            :array [{:x 1}
-                                    {:x 42}]}))
-         (set ((sut/matcher '$path-to-42)
-               {} {'$path-to-42 (sut/matcher '(scan !path (alt $path-to-42 42)))}
-               {:foo {:bar {:baz 42
-                            :zab 24}}
-                :array [{:x 1}
-                        {:x 42}]}))
-
-         (set (sut/matches '$path-to-42
-               '{$path-to-42 (scan !path (alt $path-to-42 42))}
-               {:foo {:bar {:baz 42
-                            :zab 24}}
-                :array [{:x 1}
-                        {:x 42}]}))))
-
-  (is (= #{'{!path [:array 1 :x], ?node 42}
-           '{!path [:foo :bar :zab], ?node 24}
-           '{!path [:array 1 :y 3], ?node 4}
-           '{!path [:array 1 :y 1], ?node 2}
-           '{!path [:foo :bar :baz], ?node 42}}
-         (set ((sut/matcher '$path-to-even)
-               {} {'$path-to-even (sut/matcher '(scan !path (alt $path-to-even (cat $even? ?node))))
-                   '$even? ^::sut/matcher? (fn [matches _rules data]
-                                             (when (and (number? data) (even? data))
-                                               (list matches)))}
-               {:foo {:bar {:baz 42
-                            :zab 24}}
-                :array [{:x 1}
-                        {:x 42
-                         :y [1 2 3 4]}]}))))
-
-  (is (thrown-with-msg? ExceptionInfo
-                        #"Undefined rule"
-                        (sut/matches '(scan $rule)
-                                     [1 2 3])))
-
-  (is (thrown-with-msg? ExceptionInfo
-                        #"Undefined rule"
-                        (sut/matches '(scan (%plus 1 ?n))
-                                     [1 2 3])))
-
-  (try
-    (sut/matches '(scan $rule)
-                 [1 2 3])
-    (catch ExceptionInfo e
-      (is (= {:rule '$rule}
-             (ex-data e))))))
-
-(deftest failed-binding
-  (is (not (sut/match? '{:x ?x
-                         :y ?x}
-                       {:x 1
-                        :y 2})))
-  (is (not (sut/match? '[1 2 3 & _]
-                       {:x 1}))))
-
-(deftest failed-and
-  (is (not (sut/match? '{:x ?x
-                         :y (and ?y ?x)}
-                       {:x 1
-                        :y 2}))))
-
-(deftest failed-seq
-  (is (not (sut/match? '[1 2 3]
-                       {:x 1}))))
-
-(deftest failed-map
-  (is (not (sut/match? '{:x 1
-                         :y 2}
-                       {:x 1}))))
-
-(deftest pattern-as-a-key
-  (is (= ['{?key :foo}]
-         (sut/matches '{?key 1}
-                      {:foo 1}))))
-
-(deftest precompiled-matcher
-  (let [M (sut/matcher '{?x ?y
-                         ?z ?v})]
-    (is (= ['{?x :x, ?y 1, ?z :y, ?v 2}
-            '{?x :x, ?y 1, ?z :z, ?v 3}
-            '{?x :y, ?y 2, ?z :x, ?v 1}
-            '{?x :y, ?y 2, ?z :z, ?v 3}
-            '{?x :z, ?y 3, ?z :x, ?v 1}
-            '{?x :z, ?y 3, ?z :y, ?v 2}]
-           (sut/matches M {:x 1 :y 2 :z 3})))))
-
-(deftest functional-form
-  (let [find-leafs (sut/matcher
-                    (sut/def-rule '$find-leafs
-                      (sut/alt (sut/scan '!path '$find-leafs) '?node)))]
-    (are [x y] (= x (find-leafs y))
-      '({?node 1}) 1
-
-      '({?node nil}) nil
-
-      '({!path [:x], ?node 1}
-        {!path [:y 0], ?node 2}
-        {!path [:y 1], ?node 3}
-        {!path [:y 2], ?node 4})
-      {:x 1 :y [2 3 4]})))
-
 (deftest poker-hand
-  (are [hand res] (= (ph/poker-hand hand) res)
+  (are [hand res] (= res (ph/poker-hand hand))
     #{[:♣ 10] [:♣ 14] [:♣ 12] [:♣ 13] [:♣ 11]} "Royal flush"
 
     #{[:♠ 5] [:♠ 6] [:♠ 7] [:♠ 8] [:♠ 9]} "Straight flush"
@@ -268,36 +29,154 @@
     #{[:♠ 8] [:♠ 5] [:♠ 6] [:♦ 11] [:♠ 7]} [:♦ 11]))
 
 (deftest graph
-  (is (= 46 (first (g/shortest-path g/city-to-city-distance)))))
+  (is (= 46 (g/shortest-path g/city-to-city-distance "Berlin"))))
+
+(deftest map-pattern
+  (is (= [{}]
+         ((mc/matcher {:a "a"
+                       :b "b"})
+          {:a "a"
+           :b "b"
+           :c "c"})))
+  (is (not (mc/match? {:a '?a
+                       :b '?a}
+                      {:a "a"
+                       :b "b"})))
+  (is (not (mc/match? {:a "a"} "string")))
+  (is (not (mc/match? {:a "a" :b "b"} {:a "a" :c "c"})))
+  (is (not (mc/match? {:a "a" :b "b"} {:a "a"})))
+  (is (= '[{?b "this-is-b", ?c :c}
+           {?b "this-is-b", ?c :d}
+           {?b "this-is-b", ?c :e}]
+         ((mc/matcher {:a 42
+                       :b '?b
+                       '?c 42
+                       (mc/formula (keyword ?b)) 24
+                       {:x (mc/predicate string?)} true})
+          {:a 42
+           :b "this-is-b"
+           :c 42
+           :d 42
+           :this-is-b 24
+           :e 42
+           {:x "qwe"} true
+           {:x 42} true}))))
+
+(deftest seq-pattern
+  (is (not (mc/match? '[?_ ?_] [1])))
+  (is (not (mc/match? '[] 42)))
+  (is (mc/match? '[?_ ?_] [1 2]))
+  (is (mc/match? '[?_ ?_] [1 2 3]))
+  (is (= '[{?x 1}] (mc/matches '[?x ?x ?x] [1 1 1 2])))
+  (is (= '[{?x 1 ?y 2 ?z 3}]
+         (mc/matches '[?x ?y & [?x ?y ?z]]
+                     [1 2 1 2 3]))))
+
+(deftest set-pattern
+  (is (= [{}]
+         ((mc/matcher #{1 2 3}) #{1 2 3 4 5})))
+  (is (not (mc/match? #{1 2 3} #{1 2})))
+  (is (not (mc/match? #{1 2 3} "string")))
+  (is (not (mc/match? #{1 2 3} #{1 3 4})))
+  (is (= '#{{?x 1}
+            {?x 2}
+            {?x 3}}
+         (set ((mc/matcher #{'?x}) #{1 2 3})))))
+
+(deftest placeholder-pattern
+  (is (= [{}]
+         (mc/matches '[?_ ?_ ?_a ?_a] ["ignore" "another-ignore" 1 1])))
+  (is (= '[{?_a 1}]
+         ((mc/matcher '[?_ ?_ ?_a ?_a]) ["ignore" "another-ignore" 1 1]))))
+
+(deftest formula-pattern
+  (is (= []
+         ((mc/matcher [(mc/formula (+ ?x 20)) '?x]) [42 23])))
+  (is (= [{'?x 22 '?y 42}]
+         ((mc/matcher [(mc/formula (+ ?x 20) ?y) '?x]) [42 22])))
+  (is (= [{'?x 22 '?y 42}]
+         ((mc/matcher ['?x (mc/formula (+ ?x 20) ?y)]) [22 42])))
+  (is (= [{'?x 22 '?y 1}]
+         ((mc/matcher [(mc/formula (+ ?x 20)) (mc/formula (* ?y ?x 10)) '?x '?y]) [42 220 22 1]))))
+
+(deftest result-of-pattern
+  (let [inc-x (with-meta
+                (fn [{:syms [?x]}]
+                  (inc ?x))
+                {:lvars ['?x]})
+        sum-x-y (with-meta
+                  (fn [{:syms [?x ?y]}]
+                    (+ ?x ?y))
+                  {:lvars ['?x '?y]})]
+    (is (= [{'?x 1 '?y 2}]
+           (mc/matches ['?x (mc/result-of inc-x '?y)] [1 2])))
+    (is (= [{'?x 1 '?y 2}]
+           (mc/matches ['?x (mc/result-of sum-x-y) '?y]
+                       [1 3 2])))
+    (is (not (mc/match? [(mc/result-of sum-x-y) '?y]
+                        [3 2])))))
+
+(deftest lvar-pattern
+  (is (not (mc/match? ['?x '?x] [1 2]))))
+
+(defn conj-path [path step]
+  ((fnil conj []) path step))
+
+(deftest reshape-test
+  (is (= '[{?ex-message "message 1"}
+           {?ex-message "message 3"}]
+         (mc/matches (mc/scan (mc/and (mc/predicate #(instance? ExceptionInfo %))
+                                      (mc/reshape-by (juxt ex-message ex-data)
+                                                     ['?ex-message {:type :A}])))
+                     [(ex-info "message 1" {:type :A})
+                      (ex-info "message 2" {:type :B})
+                      (ex-info "message 3" {:type :A})]))))
+
+(deftest each-pattern
+  (is (not (mc/match? (mc/each 42) [42 3 42])))
+  (is (mc/match? (mc/each 42) [42 42 42])))
+
+(deftest some-pattern
+  (is (mc/match? (mc/some 42) [42 3 42]))
+  (is (not (mc/match? (mc/some 42) [1 2 3]))))
+
+(deftest predicate-pattern
+  (is (mc/match? (mc/matcher (mc/each (mc/predicate string?))) ["qwe" "rty" "uio"]))
+  (is (not (mc/match? (mc/each (mc/predicate string?)) ["qwe" 'rty "uio"])))
+  (is (= [{'?string "qwe"}]
+         (mc/matches (mc/matcher {:string (mc/predicate string? '?string)
+                                  :number (mc/predicate number?)})
+                     {:string "qwe"
+                      :number 42
+                      :boolean true}))))
+
+(deftest and-pattern
+  (is (not (mc/match? ['?x (mc/and 42 '?x)] [43 42])))
+  (is (= [{'?x true}] (mc/matches (mc/and true '?x) true))))
+
+(deftest or-pattern
+  (is (mc/match? (mc/or 42) 42))
+  (is (not (mc/match? (mc/or (mc/predicate string?) (mc/predicate number?)) nil))))
 
 (deftest not-pattern
-  (letfn [(matches [data]
-            (sut/matches '{:foo ?foo
-                           :bar (cat ?bar (not! (%starts-with "__")))}
-                         {'%starts-with (fn [pref]
-                                          (fn [matches _ data]
-                                            (when (string/starts-with? data pref)
-                                              (list matches))))}
-                         data))]
-    (are [data res] (= res (matches data))
-      {:foo 1 :bar "qwe"}   ['{?bar "qwe" ?foo 1}]
+  (is (mc/match? (mc/not (mc/predicate string?)) 42))
+  (is (not (mc/match? (mc/not (mc/predicate string?)) "42"))))
 
-      {:foo 1 :bar "__qwe"} [])))
+(deftest if-pattern
+  (let [M (mc/if* (mc/predicate string?) '?this-is-a-string (mc/if* (mc/predicate number?) '?this-is-a-number '?i-dont-know-what-it-is))]
+    (is (= ['{?this-is-a-string "string"}]
+           (mc/matches M "string")))
+    (is (= ['{?this-is-a-number 42}]
+           (mc/matches M 42)))
+    (is (= ['{?i-dont-know-what-it-is true}]
+           (mc/matches M true))))
+  (is (not (mc/match? (mc/if* 42 '?forty-two) 43))))
 
-(deftest placeholders-removed
-  (is (= ['{?bar 2}]
-         (sut/matches '[_foo _foo ?bar]
-                      [1 1 2])))
-  (is (= []
-         (sut/matches '[_foo _foo ?bar]
-                      [1 2 3]))))
+(comment
 
-(deftest incorrect-tail-pattern
-  (is (thrown-with-msg? ExceptionInfo
-                        #"Destructuring of a sequence tail must be a single pattern"
-                        (sut/matcher '[?x & ?y ?z])))
-  (try
-    (sut/matcher '[?x & ?y ?z])
-    (catch ExceptionInfo e
-      (is (= {:pattern '(?y ?z)}
-             (ex-data e))))))
+  (mc/matches (mc/and (mc/scan (mc/formula (Math/sqrt (+ (Math/pow ?x 2) (Math/pow ?y 2))) ?z))
+                      (mc/scan '?x)
+                      (mc/scan '?y))
+              (map double (range 1 50)))
+
+  )

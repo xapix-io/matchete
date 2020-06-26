@@ -11,6 +11,11 @@
             <artifactId>math.combinatorics</artifactId>
             <version>0.1.6</version>
         </dependency>
+        <dependency>
+            <groupId>borkdude</groupId>
+            <artifactId>sci</artifactId>
+            <version>0.1.1-alpha.1</version>
+        </dependency>
     </dependencies>
     <build>
         <sourceDirectory>src</sourceDirectory>
